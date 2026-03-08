@@ -19,8 +19,24 @@ env/
 *.db
 *.sqlite
 *.sqlite3
+*.db-shm
+*.db-wal
 episodes/
 !episodes/.gitkeep
+
+# ── Media Files (audio, video, images) ───────────────────────────────────────
+*.mp3
+*.mp4
+*.wav
+*.m4a
+*.mkv
+*.webm
+*.srt
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
 
 # ── Test Artifacts ───────────────────────────────────────────────────────────
 .pytest_cache/

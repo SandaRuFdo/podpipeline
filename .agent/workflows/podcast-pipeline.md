@@ -202,13 +202,16 @@ Read `transcript.txt` and create `$EP/5_deliverables/SLIDE_SOURCE.md`:
 
 ## PHASE 6 — Generate 16:9 Visuals
 
-For each row in `SLIDE_SOURCE.md`, generate a cinematic 16:9 image.
+> 🎨 **IMAGE QUALITY RULE:** Always use the highest quality prompts. Include cinematic, photorealistic, ultra-detailed keywords to force the Pro generation model. Never use vague prompts — be extremely specific.
 
-**Prompt template:**
+For each row in `SLIDE_SOURCE.md`, generate a cinematic image using the `generate_image` tool.
+
+**Mandatory prompt template (PRO quality keywords required):**
 ```
-Ultra-wide cinematic 16:9 aspect ratio. [Scene description].
-Photorealistic or [style from memory], high detail, [mood].
-No text, no watermarks, no logos.
+Ultra-wide cinematic 16:9 aspect ratio. [Extremely detailed scene description].
+Photorealistic or [style from memory]. Ultra-high detail, film-grade lighting,
+8K resolution, [specific mood]. No text, no watermarks, no logos, no UI elements.
+Cinematic color grading.
 ```
 
 **Check visual style from memory:**
@@ -219,9 +222,20 @@ No text, no watermarks, no logos.
 
 Save all images to `$EP/4_visuals/` as `slide01_<desc>.png`, `slide02_<desc>.png`, etc.
 
+**MANDATORY: Force 16:9 1920×1080 after every image batch:**
 ```powershell
-& $MEM log $EID visuals "N images generated"
+$env:PYTHONIOENCODING="utf-8"
+# Converts ALL images in visuals folder to exact 1920x1080 YouTube format
+python scripts/force_16x9.py "$EP/4_visuals/"
 ```
+
+This uses ffmpeg `scale=1920:1080 + pad` to letterbox any aspect ratio into perfect 16:9.
+Install ffmpeg if not available: `winget install ffmpeg`
+
+```powershell
+& $MEM log $EID visuals "N images generated + force_16x9 applied → 1920x1080"
+```
+
 
 ---
 
