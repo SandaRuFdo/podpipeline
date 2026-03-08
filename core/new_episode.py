@@ -131,8 +131,10 @@ def main():
     match = re.search(r"ID:(\d+)", result)
     if match:
         eid = match.group(1)
-        run_mem("log", eid, "research", "Episode created")
         run_mem("episode", "update", eid, "ep_path", str(ep_dir))
+        run_mem("pipeline", "init", eid)
+        run_mem("pipeline", "set", eid, "setup", "done")
+        run_mem("log", eid, "setup", "Episode created")
 
     ok(f"Memory ID: {eid or '?'}")
 

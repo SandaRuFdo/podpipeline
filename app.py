@@ -220,9 +220,8 @@ def get_episode(eid):
     ep = mem("episode", "get", eid)
     if not isinstance(ep, dict):
         return jsonify({"error": "not found"}), 404
-    _auto_detect_phases(eid, ep)  # auto-mark phases based on filesystem
-    pipeline_raw = mem_raw("pipeline", "status", eid)
-    phases   = _parse_pipeline(pipeline_raw)
+    _auto_detect_phases(eid, ep)  # auto-mark phases via direct SQLite
+    phases   = _get_phases_direct(eid)  # read back from SQLite directly
     sources  = _get_sources(eid)
     ctx      = mem_raw("context", eid)
     audience = mem("audience", "get", ep.get("target_audience", "scifi_curious"))
@@ -317,7 +316,7 @@ def export_episode(eid):
     if not isinstance(ep, dict):
         return jsonify({"error": "not found"}), 404
     _auto_detect_phases(eid, ep)
-    phases = _parse_pipeline(mem_raw("pipeline", "status", eid))
+    phases = _get_phases_direct(eid)
     sources = _get_sources(eid)
     ctx = mem_raw("context", eid)
     payload = {"episode": ep, "phases": phases, "sources": sources, "context": ctx}
@@ -440,6 +439,26 @@ def _get_sources(eid):
     except: return []
 
 
+def _get_phases_direct(eid):
+    """Read pipeline phases directly from SQLite — no subprocess."""
+    import sqlite3
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+    if not db_path.exists():
+        return [{"phase": p, "status": "pending"} for p in PHASE_ORDER]
+    try:
+        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id", (eid,)
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return [{"phase": p, "status": "pending"} for p in PHASE_ORDER]
+        phase_map = {r["phase"]: r["status"] for r in rows}
+        return [{"phase": p, "status": phase_map.get(p, "pending")} for p in PHASE_ORDER]
+    except:
+        return [{"phase": p, "status": "pending"} for p in PHASE_ORDER]
+
+
 def _auto_detect_phases(eid, ep):
     """Check filesystem for completed work and auto-mark phases via direct SQLite."""
     import sqlite3
@@ -467,6 +486,20 @@ def _auto_detect_phases(eid, ep):
 
     try:
         conn = sqlite3.connect(str(db_path))
+
+        # Auto-init pipeline rows if they don't exist yet
+        existing = conn.execute(
+            "SELECT COUNT(*) FROM pipeline_state WHERE episode_id=?", (eid,)
+        ).fetchone()[0]
+        if existing == 0:
+            phases_list = ["setup","research","script","audio","transcribe","visuals","deliverables","cinematic_setup"]
+            for ph in phases_list:
+                conn.execute(
+                    "INSERT OR IGNORE INTO pipeline_state(episode_id, phase, status) VALUES(?,?,'pending')",
+                    (eid, ph)
+                )
+            conn.commit()
+
         # Get all pending phases in one query
         rows = conn.execute(
             "SELECT phase, status FROM pipeline_state WHERE episode_id=? AND status='pending'",
