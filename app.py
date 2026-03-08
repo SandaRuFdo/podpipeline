@@ -547,29 +547,28 @@ def _auto_detect_phases(eid, ep):
             r = mem_raw("pipeline", "set", eid, phase, "done")
             print(f"[trace] set {phase} done: {r[:50]}", file=sys.stderr)
 
-        # Auto-progress: always ensure first pending phase is marked 'running'
-        # Re-read state after subprocess writes (mem_raw is synchronous)
-        import time; time.sleep(0.1)  # tiny delay to let WAL checkpoint
-        conn3 = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
-        all_rows = conn3.execute(
-            "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id",
-            (eid,)
-        ).fetchall()
-        conn3.close()
+        # Auto-progress: ONLY advance when we JUST marked something done AND
+        # nothing is already running (sequential pipeline — one step at a time)
+        if to_mark_done:
+            import time; time.sleep(0.15)  # let WAL checkpoint
+            conn3 = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
+            all_rows = conn3.execute(
+                "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id",
+                (eid,)
+            ).fetchall()
+            conn3.close()
 
-        phase_status = {r[0]: r[1] for r in all_rows}
-        any_done = any(s == "done" for s in phase_status.values())
-        if any_done:
-            next_phase = next(
-                (ph for ph in PHASE_ORDER if phase_status.get(ph) == "pending"),
-                None
-            )
-            if next_phase:
-                print(f"[trace] marking next_phase={next_phase} as running", file=sys.stderr)
-                r2 = mem_raw("pipeline", "set", eid, next_phase, "running")
-                print(f"[trace] running result: {r2[:80]}", file=sys.stderr)
+            phase_status = {r[0]: r[1] for r in all_rows}
+            already_running = any(s == "running" for s in phase_status.values())
 
-
+            if not already_running:
+                # Find next phase that is still pending
+                next_phase = next(
+                    (ph for ph in PHASE_ORDER if phase_status.get(ph) == "pending"),
+                    None
+                )
+                if next_phase:
+                    mem_raw("pipeline", "set", eid, next_phase, "running")
 
     except Exception as e:
         print(f"[auto-detect] ERROR eid={eid}: {type(e).__name__}: {e}", file=sys.stderr)
