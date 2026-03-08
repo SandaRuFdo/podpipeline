@@ -468,15 +468,19 @@ def build_skill_profile():
         yield f"data: {json.dumps({'log': '[BUILD] Starting profile research…'})}\n\n"
         time.sleep(0.3)
 
-        # Get language label
+        # Get language label (parse JSON properly instead of naive string split)
         langs_raw = mem_raw("language", "list")
-        lang_label = lang
-        for line in langs_raw.splitlines():
-            if lang in line:
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    lang_label = " ".join(parts[1:]).strip()
-                break
+        lang_label = lang  # fallback
+        try:
+            langs = json.loads(langs_raw.strip())
+            for entry in langs:
+                if isinstance(entry, dict) and entry.get("code") == lang:
+                    lang_label = entry.get("name", lang)
+                    break
+        except (json.JSONDecodeError, TypeError):
+            # Fallback: use lang code capitalized
+            lang_label = {"de": "German", "en": "English", "fr": "French",
+                          "es": "Spanish", "pt": "Portuguese"}.get(lang, lang.title())
 
         # Get audience data
         aud = mem("audience", "get", audience)

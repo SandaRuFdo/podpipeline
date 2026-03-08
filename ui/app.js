@@ -170,7 +170,8 @@ function checkSkillProfile() {
         badge.classList.add("found");
         icon.textContent = "✅";
         const p = data.profile;
-        msg.textContent = `Writing profile loaded — ${p.lang_label} × ${p.audience_label} (${p.tone?.slice(0, 55)}…)`;
+        const lbl = (p.lang_label && p.lang_label.length < 30) ? p.lang_label : (p.lang || "?").toUpperCase();
+        msg.textContent = `Writing profile: ${lbl} × ${p.audience_label || "?"} — ${(p.tone || "").slice(0, 40)}…`;
         btn.textContent = "Rebuild";
         btn.classList.remove("hidden");
       } else {
