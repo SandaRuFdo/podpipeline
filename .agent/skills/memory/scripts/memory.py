@@ -191,6 +191,51 @@ def init_db():
             updated_at       TEXT DEFAULT (datetime('now')),
             UNIQUE(lang_code, audience_key)
         );
+
+        -- ── FEATURE 2: Phase outputs tracking ─────────────────────────────────
+        CREATE TABLE IF NOT EXISTS phase_outputs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            episode_id  INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+            phase       TEXT NOT NULL,
+            output_key  TEXT NOT NULL,
+            output_val  TEXT,
+            verified    INTEGER DEFAULT 0,
+            created_at  TEXT DEFAULT (datetime('now'))
+        );
+
+        -- ── FEATURE 4: Session handoff state ──────────────────────────────────
+        CREATE TABLE IF NOT EXISTS session_state (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            episode_id           INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
+            current_phase        TEXT,
+            next_action          TEXT,
+            resume_instruction   TEXT,
+            saved_at             TEXT DEFAULT (datetime('now'))
+        );
+
+        -- ── FEATURE 5: Workflow contract ──────────────────────────────────────
+        CREATE TABLE IF NOT EXISTS workflow_contract (
+            phase            TEXT PRIMARY KEY,
+            step_order       INTEGER NOT NULL,
+            description      TEXT,
+            required_inputs  TEXT DEFAULT '[]',
+            required_outputs TEXT DEFAULT '[]',
+            verify_cmd       TEXT,
+            depends_on       TEXT DEFAULT '[]'
+        );
+
+        -- ── FEATURE 1: Profile evolution audit log ────────────────────────────
+        CREATE TABLE IF NOT EXISTS profile_evolution_log (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            lang         TEXT NOT NULL,
+            audience     TEXT NOT NULL,
+            episode_id   INTEGER,
+            quality_score INTEGER,
+            field_changed TEXT,
+            old_value    TEXT,
+            new_value    TEXT,
+            created_at   TEXT DEFAULT (datetime('now'))
+        );
     """)
     db.commit()
     db.close()
@@ -381,6 +426,7 @@ def skill_profile_context(lang, audience):
 
 
 
+
 def _fts(db, type_, eid, title, content, tags=""):
     db.execute(
         "INSERT INTO memory_fts(type,entity_id,title,content,tags) VALUES(?,?,?,?,?)",
@@ -390,6 +436,467 @@ def _fts(db, type_, eid, title, content, tags=""):
 def _to_sec(t):
     p = t.split(":")
     return int(p[0]) * 60 + int(p[1])
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 1 — EVOLVING QUALITY PROFILES
+# Auto-update skill profile avoid/hooks based on episode quality scores
+# ══════════════════════════════════════════════════════════════════════════════
+
+def auto_evolve_profile(eid):
+    """Read quality notes for episode, evolve the matching skill profile.
+    
+    - score < 7  → append failure notes to profile avoid list  
+    - score >= 9 → promote success notes to hooks
+    """
+    db = get_db()
+    ep = db.execute("SELECT * FROM episodes WHERE id=?", (eid,)).fetchone()
+    if not ep:
+        db.close(); return "Episode not found"
+    
+    lang     = ep["output_language"]
+    audience = ep["target_audience"]
+    
+    notes = db.execute(
+        "SELECT * FROM quality_notes WHERE episode_id=? ORDER BY created_at DESC",
+        (eid,)
+    ).fetchall()
+    
+    if not notes:
+        db.close(); return f"No quality notes for episode {eid}"
+    
+    profile = db.execute(
+        "SELECT * FROM skill_profiles WHERE lang=? AND audience=?",
+        (lang, audience)
+    ).fetchone()
+    
+    if not profile:
+        db.close(); return f"No profile found for {lang}/{audience}"
+    
+    changes = []
+    for n in notes:
+        score = n["rating"] or 5
+        
+        if score < 7 and n["failed"]:
+            old_avoid = profile["avoid"] or ""
+            new_entry = f"\n• [Ep{eid} score={score}] {n['failed']}"
+            if new_entry.strip() not in old_avoid:
+                db.execute(
+                    "UPDATE skill_profiles SET avoid=?, updated_at=datetime('now') WHERE lang=? AND audience=?",
+                    (old_avoid + new_entry, lang, audience)
+                )
+                db.execute(
+                    "INSERT INTO profile_evolution_log(lang,audience,episode_id,quality_score,field_changed,old_value,new_value) VALUES(?,?,?,?,?,?,?)",
+                    (lang, audience, eid, score, "avoid", old_avoid[-100:], new_entry)
+                )
+                changes.append(f"avoid ← {n['failed'][:60]}")
+        
+        if score >= 9 and n["worked"]:
+            old_hooks = profile["hooks"] or ""
+            new_entry = f"\n• [Ep{eid} score={score}] {n['worked']}"
+            if new_entry.strip() not in old_hooks:
+                db.execute(
+                    "UPDATE skill_profiles SET hooks=?, updated_at=datetime('now') WHERE lang=? AND audience=?",
+                    (old_hooks + new_entry, lang, audience)
+                )
+                db.execute(
+                    "INSERT INTO profile_evolution_log(lang,audience,episode_id,quality_score,field_changed,old_value,new_value) VALUES(?,?,?,?,?,?,?)",
+                    (lang, audience, eid, score, "hooks", old_hooks[-100:], new_entry)
+                )
+                changes.append(f"hooks ← {n['worked'][:60]}")
+    
+    db.commit(); db.close()
+    
+    if changes:
+        return f"Profile {lang}/{audience} evolved:\n" + "\n".join(f"  • {c}" for c in changes)
+    return f"Profile {lang}/{audience} — no evolution needed (scores in range)"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 2 — PHASE OUTPUTS TRACKING
+# Record what each phase produced, with optional filesystem verification
+# ══════════════════════════════════════════════════════════════════════════════
+
+def phase_output_set(eid, phase, key, value, verify=False):
+    """Record a phase output. If verify=True, check the path actually exists."""
+    db = get_db()
+    verified = 0
+    if verify:
+        import os
+        verified = 1 if os.path.exists(str(value)) else 0
+    
+    db.execute(
+        """INSERT INTO phase_outputs(episode_id, phase, output_key, output_val, verified)
+           VALUES(?,?,?,?,?)
+           ON CONFLICT DO UPDATE SET output_val=excluded.output_val, 
+           verified=excluded.verified, created_at=datetime('now')""",
+        (eid, phase, key, str(value), verified)
+    )
+    db.commit(); db.close()
+    status = "✅ verified" if verified else ("⚠️ not found" if verify else "📝 recorded")
+    print(f"[{phase}] {key} = {str(value)[:80]} {status}")
+
+
+def phase_output_get(eid, phase=None):
+    """Get all outputs for an episode, optionally filtered by phase."""
+    db = get_db()
+    if phase:
+        rows = db.execute(
+            "SELECT * FROM phase_outputs WHERE episode_id=? AND phase=? ORDER BY created_at",
+            (eid, phase)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM phase_outputs WHERE episode_id=? ORDER BY phase, created_at",
+            (eid,)
+        ).fetchall()
+    db.close()
+    return [dict(r) for r in rows]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 3 — SMART CONTEXT (FTS-FILTERED)
+# Topic-aware context — only relevant past episodes, top-rated sources, profile
+# ══════════════════════════════════════════════════════════════════════════════
+
+def smart_context(eid):
+    """Build laser-targeted context for an episode using FTS topic search.
+    
+    Returns focused context: characters + skill profile + similar past episodes
+    + top-rated sources for this topic + avoid list from quality failures.
+    """
+    db = get_db()
+    ep = db.execute("SELECT * FROM episodes WHERE id=?", (eid,)).fetchone()
+    if not ep:
+        db.close()
+        return build_context(eid)  # fallback
+    
+    topic = ep["topic"] or ""
+    lang  = ep["output_language"]
+    aud   = ep["target_audience"]
+    
+    lines = [f"# SMART CONTEXT — Episode {eid}: {ep['title_de']}",
+             f"Topic: {topic} | Lang: {lang} | Audience: {aud}", ""]
+    
+    # 1. Characters (always needed)
+    chars = db.execute("SELECT name, role, personality, voice_notes FROM characters").fetchall()
+    if chars:
+        lines.append("## 🎭 Characters")
+        for c in chars:
+            lines.append(f"**{c['name']}** ({c['role']}): {c['personality'] or ''}")
+            if c['voice_notes']: lines.append(f"  Voice: {c['voice_notes']}")
+        lines.append("")
+    
+    # 2. Skill profile for this episode
+    profile = db.execute(
+        "SELECT * FROM skill_profiles WHERE lang=? AND audience=?",
+        (lang, aud)
+    ).fetchone()
+    if profile:
+        lines.append(f"## ✍️ Writing Profile: {profile.get('lang_label','?')} × {profile.get('audience_label','?')}")
+        lines.append(f"Tone: {(profile['tone'] or '')[:200]}")
+        lines.append(f"Slang: {(profile['slang'] or '')[:200]}")
+        lines.append(f"Avoid: {(profile['avoid'] or '')[:200]}")
+        lines.append("")
+    
+    # 3. FTS: find similar past episodes
+    try:
+        topic_words = " OR ".join(w for w in topic.split() if len(w) > 3)
+        similar = db.execute(
+            """SELECT e.id, e.title_de, e.topic, e.status
+               FROM episodes e
+               JOIN memory_fts m ON m.entity_id = CAST(e.id AS TEXT)
+               WHERE m.content MATCH ? AND e.id != ?
+               LIMIT 3""",
+            (topic_words, eid)
+        ).fetchall() if topic_words else []
+        
+        if similar:
+            lines.append("## 📺 Similar Past Episodes (avoid repetition)")
+            for s in similar:
+                lines.append(f"  S?E? [{s['status']}] {s['title_de']} — {s['topic']}")
+            lines.append("")
+    except Exception:
+        pass
+    
+    # 4. Top-rated sources for related topics
+    top_sources = db.execute(
+        """SELECT s.title, s.url, s.quality, s.source_type
+           FROM sources s JOIN episodes e ON s.episode_id = e.id
+           WHERE s.quality >= 4 AND (e.topic LIKE ? OR e.topic LIKE ?)
+           ORDER BY s.quality DESC LIMIT 5""",
+        (f"%{topic[:20]}%", f"%{topic.split()[0] if topic else ''}%")
+    ).fetchall()
+    
+    if top_sources:
+        lines.append("## ⭐ Top-Rated Sources (reuse these)")
+        for s in top_sources:
+            lines.append(f"  ★{s['quality']} [{s['source_type']}] {s['title'] or s['url'] or 'N/A'}")
+        lines.append("")
+    
+    # 5. Recent quality failures for this profile
+    fails = db.execute(
+        """SELECT qn.failed, qn.rating 
+           FROM quality_notes qn JOIN episodes e ON qn.episode_id = e.id
+           WHERE e.output_language=? AND e.target_audience=? AND qn.rating < 7
+           ORDER BY qn.created_at DESC LIMIT 3""",
+        (lang, aud)
+    ).fetchall()
+    
+    if fails:
+        lines.append("## ⛔ Recent Quality Failures (AVOID these)")
+        for f in fails:
+            lines.append(f"  [score={f['rating']}] {f['failed']}")
+        lines.append("")
+    
+    db.close()
+    return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 4 — SESSION HANDOFF
+# Save/load pipeline state so any new session can resume exactly where left off
+# ══════════════════════════════════════════════════════════════════════════════
+
+def session_save(eid, phase, next_action, resume_instruction):
+    """Save current pipeline state for session handoff."""
+    import json as _json
+    db = get_db()
+    db.execute(
+        "INSERT INTO session_state(episode_id, current_phase, next_action, resume_instruction) VALUES(?,?,?,?)",
+        (eid, phase, next_action, resume_instruction)
+    )
+    db.commit()
+    
+    # Also write a human-readable JSON file to the episode folder
+    ep = db.execute("SELECT ep_path FROM episodes WHERE id=?", (eid,)).fetchone()
+    db.close()
+    
+    state = {
+        "episode_id": eid,
+        "current_phase": phase,
+        "next_action": next_action,
+        "resume_instruction": resume_instruction,
+        "saved_at": __import__("datetime").datetime.now().isoformat()
+    }
+    
+    # Write to project root as well, so it's always findable
+    import os
+    state_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))), "session_state.json")
+    
+    with open(state_path, "w", encoding="utf-8") as f:
+        _json.dump(state, f, indent=2, ensure_ascii=False)
+    
+    print(f"💾 Session saved — Episode {eid}, phase '{phase}'")
+    print(f"   Next: {next_action[:100]}")
+    print(f"   Resume: {resume_instruction[:100]}")
+
+
+def session_load():
+    """Load the latest saved session state."""
+    import os, json as _json
+    state_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))), "session_state.json")
+    
+    if not os.path.exists(state_path):
+        return None
+    
+    with open(state_path, encoding="utf-8") as f:
+        return _json.load(f)
+
+
+def session_clear():
+    """Clear the session state (call after episode is complete)."""
+    import os
+    state_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__))))), "session_state.json")
+    
+    if os.path.exists(state_path):
+        os.remove(state_path)
+        print("Session state cleared.")
+    else:
+        print("No session state to clear.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 5 — WORKFLOW CONTRACT ENFORCEMENT
+# Verify all preconditions before a phase starts — blocks skipping steps
+# ══════════════════════════════════════════════════════════════════════════════
+
+_CONTRACT = {
+    "setup":         {"order":1, "depends_on":[],
+                      "inputs":[], "outputs":["ep_path"],
+                      "desc":"Create episode folder structure + register in memory"},
+    "research":      {"order":2, "depends_on":["setup"],
+                      "inputs":["ep_path"], "outputs":["1_research/sources"],
+                      "desc":"Find YouTube sources, download subtitles, add to NotebookLM"},
+    "script":        {"order":3, "depends_on":["research"],
+                      "inputs":["1_research/sources","skill_profile"],
+                      "outputs":["2_script/SCRIPT_DE.md","2_script/SCRIPT_EN.md"],
+                      "desc":"Write script using skill profile — target lang + English"},
+    "audio":         {"order":4, "depends_on":["script"],
+                      "inputs":["2_script/SCRIPT_DE.md","notebook_id"],
+                      "outputs":["3_audio/podcast.mp3"],
+                      "desc":"Generate podcast via NotebookLM, download MP3"},
+    "transcribe":    {"order":5, "depends_on":["audio"],
+                      "inputs":["3_audio/podcast.mp3"],
+                      "outputs":["3_audio/transcript.txt"],
+                      "desc":"Transcribe with Whisper, generate timestamps"},
+    "visuals":       {"order":6, "depends_on":["transcribe"],
+                      "inputs":["3_audio/transcript.txt","5_deliverables/SLIDE_SOURCE.md"],
+                      "outputs":["4_visuals"],
+                      "desc":"Generate 16:9 cinematic images in parallel batches"},
+    "deliverables":  {"order":7, "depends_on":["visuals"],
+                      "inputs":["4_visuals"],
+                      "outputs":["5_deliverables/walkthrough.md"],
+                      "desc":"Build CapCut walkthrough + register in memory"},
+    "cinematic_setup":{"order":8, "depends_on":["research"],
+                       "inputs":["1_research/sources"],
+                       "outputs":["cinematic_notebook_id"],
+                       "desc":"Create English-only NotebookLM notebook for cinematic video"},
+}
+
+def _seed_contract():
+    """Seed the workflow_contract table if empty."""
+    import json
+    db = get_db()
+    count = db.execute("SELECT COUNT(*) FROM workflow_contract").fetchone()[0]
+    if count == 0:
+        for phase, c in _CONTRACT.items():
+            db.execute(
+                "INSERT OR REPLACE INTO workflow_contract(phase,step_order,description,required_inputs,required_outputs,depends_on) VALUES(?,?,?,?,?,?)",
+                (phase, c["order"], c["desc"],
+                 json.dumps(c["inputs"]), json.dumps(c["outputs"]),
+                 json.dumps(c["depends_on"]))
+            )
+        db.commit()
+    db.close()
+
+
+def contract_verify(eid, phase):
+    """Verify all preconditions for a phase before starting.
+    
+    Returns a dict: {ok: bool, issues: [...], ready: [...]}
+    Prints a clear summary — use this at the start of every phase.
+    """
+    import json, os
+    _seed_contract()
+    
+    if phase not in _CONTRACT:
+        print(f"❌ Unknown phase: {phase}")
+        return {"ok": False, "issues": [f"Unknown phase: {phase}"]}
+    
+    c = _CONTRACT[phase]
+    db = get_db()
+    ep = db.execute("SELECT * FROM episodes WHERE id=?", (eid,)).fetchone()
+    
+    issues = []
+    ready  = []
+    
+    if not ep:
+        db.close()
+        print(f"❌ Episode {eid} not found")
+        return {"ok": False, "issues": ["Episode not found"]}
+    
+    ep_path = ep["ep_path"] or ""
+    
+    # Check dependend phases are done
+    pipeline = {r["phase"]: r["status"] 
+                for r in db.execute("SELECT phase,status FROM pipeline_state WHERE episode_id=?", (eid,)).fetchall()}
+    
+    for dep in c["depends_on"]:
+        dep_status = pipeline.get(dep, "pending")
+        if dep_status not in ("done", "skipped"):
+            issues.append(f"Phase '{dep}' not complete (status: {dep_status})")
+        else:
+            ready.append(f"Phase '{dep}' ✅")
+    
+    # Check required input files
+    for inp in c["inputs"]:
+        if inp in ("ep_path", "notebook_id", "skill_profile", "cinematic_notebook_id"):
+            # Check DB field
+            val = ep[inp] if inp in ep.keys() else None
+            if not val:
+                issues.append(f"DB field '{inp}' is not set")
+            else:
+                ready.append(f"{inp} = {str(val)[:50]} ✅")
+        elif ep_path:
+            full = os.path.join(ep_path, inp)
+            if os.path.exists(full):
+                ready.append(f"{inp} ✅")
+            else:
+                issues.append(f"Missing: {full}")
+    
+    db.close()
+    ok = len(issues) == 0
+    
+    print(f"\n{'✅ CONTRACT OK' if ok else '❌ CONTRACT FAILED'} — Phase '{phase}' (Ep {eid})")
+    if ready:
+        for r in ready: print(f"  ✓ {r}")
+    if issues:
+        print(f"\n  BLOCKING ISSUES:")
+        for i in issues: print(f"  ✗ {i}")
+    print()
+    
+    return {"ok": ok, "issues": issues, "ready": ready}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FEATURE 6 — PARALLEL PHASE DETECTION
+# Show which phases can run simultaneously right now
+# ══════════════════════════════════════════════════════════════════════════════
+
+def parallel_opportunities(eid):
+    """Return phases that can run RIGHT NOW in parallel.
+    
+    A phase is ready if all its dependencies are done/skipped AND it's pending.
+    Returns groups of phases that can fire simultaneously.
+    """
+    _seed_contract()
+    db = get_db()
+    
+    pipeline = {r["phase"]: r["status"]
+                for r in db.execute("SELECT phase,status FROM pipeline_state WHERE episode_id=?", (eid,)).fetchall()}
+    db.close()
+    
+    ready_now = []
+    blocked   = []
+    
+    for phase, c in _CONTRACT.items():
+        status = pipeline.get(phase, "pending")
+        if status in ("done", "skipped"):
+            continue
+        
+        deps_done = all(pipeline.get(d, "pending") in ("done", "skipped") for d in c["depends_on"])
+        
+        if deps_done:
+            ready_now.append({"phase": phase, "order": c["order"], "desc": c["desc"]})
+        else:
+            missing_deps = [d for d in c["depends_on"] if pipeline.get(d, "pending") not in ("done","skipped")]
+            blocked.append({"phase": phase, "waiting_for": missing_deps})
+    
+    ready_now.sort(key=lambda x: x["order"])
+    
+    print(f"\n⚡ PARALLEL OPPORTUNITIES — Episode {eid}")
+    if ready_now:
+        print(f"\n  🟢 CAN START NOW ({len(ready_now)} phases):")
+        for r in ready_now:
+            print(f"     [{r['order']}] {r['phase']:20} — {r['desc']}")
+        if len(ready_now) > 1:
+            print(f"\n  💡 TIP: Fire ALL {len(ready_now)} simultaneously for maximum speed!")
+    else:
+        print("  No phases ready to start right now.")
+    
+    if blocked:
+        print(f"\n  🔴 BLOCKED ({len(blocked)} phases):")
+        for b in blocked:
+            print(f"     {b['phase']:20} → waiting for: {', '.join(b['waiting_for'])}")
+    print()
+    
+    return {"ready": ready_now, "blocked": blocked}
+
+
 
 
 # ── EPISODES ─────────────────────────────────────────────────────────────────
@@ -1067,10 +1574,88 @@ def main():
         elif sub == "context" and len(a) >= 5:
             ctx = skill_profile_context(a[3], a[4])
             print(ctx)
+        elif sub == "evolve" and len(a) >= 4:
+            # Feature 1: evolve profile from quality notes
+            result = auto_evolve_profile(int(a[3]))
+            print(result)
         else:
             print("Usage: profile get <lang> <audience>")
             print("       profile list")
             print("       profile context <lang> <audience>")
+            print("       profile evolve <episode_id>")
+
+    # ── Feature 2: Phase outputs ───────────────────────────────────────────────
+    elif cmd == "output":
+        sub = a[2]
+        if sub == "set" and len(a) >= 6:
+            verify = "--verify" in a
+            phase_output_set(int(a[3]), a[4], a[5], a[6] if len(a) > 6 and not a[6].startswith("--") else "", verify)
+        elif sub == "get":
+            phase = a[4] if len(a) > 4 else None
+            rows = phase_output_get(int(a[3]), phase)
+            if not rows:
+                print("No outputs recorded.")
+            for r in rows:
+                v = "✅" if r["verified"] else "📝"
+                print(f"  {v} [{r['phase']}] {r['output_key']} = {r['output_val']}")
+        else:
+            print("Usage: output set <eid> <phase> <key> <value> [--verify]")
+            print("       output get <eid> [phase]")
+
+    # ── Feature 3: Smart context ───────────────────────────────────────────────
+    elif cmd == "smart-context":
+        print(smart_context(int(a[2])))
+
+    # ── Feature 4: Session handoff ─────────────────────────────────────────────
+    elif cmd == "session":
+        sub = a[2]
+        if sub == "save" and len(a) >= 6:
+            session_save(int(a[3]), a[4], a[5], a[6] if len(a) > 6 else "")
+        elif sub == "load":
+            state = session_load()
+            if state:
+                print(f"\n💾 SESSION STATE")
+                print(f"  Episode     : {state['episode_id']}")
+                print(f"  Phase       : {state['current_phase']}")
+                print(f"  Saved at    : {state.get('saved_at','?')}")
+                print(f"\n  ▶ NEXT ACTION:")
+                print(f"  {state['next_action']}")
+                print(f"\n  📋 RESUME INSTRUCTION:")
+                print(f"  {state['resume_instruction']}")
+                print()
+            else:
+                print("No session state found. Start fresh.")
+        elif sub == "clear":
+            session_clear()
+        else:
+            print("Usage: session save <eid> <phase> \"<next_action>\" \"<resume>\"")
+            print("       session load")
+            print("       session clear")
+
+    # ── Feature 5: Contract verification ──────────────────────────────────────
+    elif cmd == "contract":
+        sub = a[2]
+        if sub == "verify" and len(a) >= 5:
+            contract_verify(int(a[3]), a[4])
+        elif sub == "list":
+            _seed_contract()
+            db = get_db()
+            rows = db.execute("SELECT * FROM workflow_contract ORDER BY step_order").fetchall()
+            db.close()
+            print("\n📋 WORKFLOW CONTRACT")
+            for r in rows:
+                print(f"  [{r['step_order']}] {r['phase']:20} — {r['description']}")
+            print()
+        else:
+            print("Usage: contract verify <eid> <phase>")
+            print("       contract list")
+
+    # ── Feature 6: Parallel opportunities ─────────────────────────────────────
+    elif cmd == "parallel":
+        if len(a) >= 3:
+            parallel_opportunities(int(a[2]))
+        else:
+            print("Usage: parallel <episode_id>")
 
     else:
         print(f"Unknown: {cmd}\n{HELP}")
