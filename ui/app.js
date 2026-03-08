@@ -164,7 +164,7 @@ function checkSkillProfile() {
   clearTimeout(_profileCheckTimer);
   _profileCheckTimer = setTimeout(async () => {
     try {
-      const res = await fetch(`/api/skill-profiles/${lang}/${audience}`);
+      const res = await fetch(`/api/skill-profiles/check/${lang}/${audience}`);
       const data = await res.json();
       if (data.exists) {
         badge.classList.add("found");

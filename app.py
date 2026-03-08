@@ -95,98 +95,6 @@ def get_audiences():
 
 
 
-# ── SKILL PROFILES ────────────────────────────────────────────────────────────
-
-RESEARCHER = [sys.executable, str(BASE / ".agent/skills/memory/scripts/skill_researcher.py")]
-
-@app.route("/api/skill-profiles")
-def list_skill_profiles():
-    try:
-        result = mem("skill-profile", "list")
-        if isinstance(result, list):
-            return jsonify(result)
-        # Call researcher --list directly
-        r = subprocess.run(RESEARCHER + ["--list", "en", "gen_z"],
-                           capture_output=True, text=True, encoding="utf-8")
-        return jsonify([])
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/skill-profiles/<lang>/<audience>")
-def get_skill_profile(lang, audience):
-    """Check if profile exists. Returns profile or {exists: false}."""
-    try:
-        import sys as _sys
-        _sys.path.insert(0, str(BASE / ".agent/skills/memory/scripts"))
-        import memory as _mem
-        profile = _mem.skill_profile_get(lang, audience)
-        if profile:
-            return jsonify({"exists": True, "profile": profile})
-        return jsonify({"exists": False, "lang": lang, "audience": audience})
-    except Exception as e:
-        return jsonify({"exists": False, "error": str(e)})
-
-
-@app.route("/api/skill-profiles/research", methods=["POST"])
-def research_skill_profile():
-    """
-    Trigger profile research for a lang+audience combo (SSE streaming).
-    Body: { "lang": "en", "audience": "gen_z", "force": false }
-    """
-    body = request.json or {}
-    lang     = body.get("lang", "en")
-    audience = body.get("audience", "gen_z")
-    force    = body.get("force", False)
-
-    job_id = str(uuid.uuid4())[:8]
-    q: queue.Queue = queue.Queue()
-    _jobs[job_id] = q
-
-    def run():
-        cmd = RESEARCHER + [lang, audience]
-        if force:
-            cmd.append("--force")
-        try:
-            proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True, encoding="utf-8"
-            )
-            # Stream stderr ([INFO]/[BUILD]/[SAVE] lines) live
-            for line in proc.stderr:
-                q.put(line.rstrip())
-            proc.wait()
-            stdout = proc.stdout.read().strip()
-            if proc.returncode == 0:
-                try:
-                    profile = json.loads(stdout)
-                    q.put(f"[DONE] profile:{json.dumps(profile, ensure_ascii=False)}")
-                except Exception:
-                    q.put("[DONE] profile:null")
-            else:
-                q.put(f"[ERROR] Research failed (exit {proc.returncode})")
-        except Exception as ex:
-            q.put(f"[ERROR] {ex}")
-        finally:
-            q.put(None)  # sentinel
-
-    threading.Thread(target=run, daemon=True).start()
-
-    def stream():
-        yield f"data: {json.dumps({'job': job_id, 'status': 'started'})}\n\n"
-        while True:
-            line = _jobs[job_id].get()
-            if line is None:
-                yield "data: {\"status\":\"done\"}\n\n"
-                break
-            if line.startswith("[DONE] profile:"):
-                payload = line[len("[DONE] profile:"):]
-                yield f"data: {json.dumps({'status':'complete','profile': json.loads(payload) if payload != 'null' else None})}\n\n"
-            else:
-                yield f"data: {json.dumps({'log': line})}\n\n"
-
-    return Response(stream_with_context(stream()), mimetype="text/event-stream")
-
 
 # ── EPISODES ──────────────────────────────────────────────────────────────────
 
@@ -431,6 +339,163 @@ def suggest():
     return jsonify(r if isinstance(r, dict) else {"suggestion": "paranormal"})
 
 
+# ── SKILL PROFILES ─────────────────────────────────────────────────────────────
+
+def _ensure_skill_profiles_table():
+    """Create skill_profiles table if it doesn't exist yet."""
+    import sqlite3
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+    conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lang TEXT NOT NULL,
+            audience TEXT NOT NULL,
+            lang_label TEXT,
+            audience_label TEXT,
+            tone TEXT,
+            vocab TEXT,
+            slang TEXT,
+            cultural_refs TEXT,
+            hooks TEXT,
+            avoid TEXT,
+            created_at TIMESTAMP DEFAULT (datetime('now')),
+            UNIQUE(lang, audience)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+@app.route("/api/skill-profiles/check/<lang>/<audience>")
+def get_skill_profile(lang, audience):
+    """Check if a writing profile exists for this lang+audience combo."""
+    import sqlite3
+    _ensure_skill_profiles_table()
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+    try:
+        conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM skill_profiles WHERE lang=? AND audience=?", (lang, audience)
+        ).fetchone()
+        conn.close()
+        if row:
+            return jsonify({"exists": True, "profile": dict(row)})
+        return jsonify({"exists": False})
+    except Exception as e:
+        return jsonify({"exists": False, "error": str(e)})
+
+
+@app.route("/api/skill-profiles/research", methods=["POST"])
+def build_skill_profile():
+    """Build a writing skill profile for lang+audience. Streams SSE progress."""
+    import sqlite3
+    d = request.json or {}
+    lang = d.get("lang", "de")
+    audience = d.get("audience", "scifi_curious")
+    force = d.get("force", False)
+
+    _ensure_skill_profiles_table()
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+
+    def generate():
+        import json, time
+        yield f"data: {json.dumps({'log': '[BUILD] Starting profile research…'})}\n\n"
+        time.sleep(0.3)
+
+        # Get language label
+        langs_raw = mem_raw("language", "list")
+        lang_label = lang
+        for line in langs_raw.splitlines():
+            if lang in line:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    lang_label = " ".join(parts[1:]).strip()
+                break
+
+        # Get audience data
+        aud = mem("audience", "get", audience)
+        aud_label = aud.get("label", audience) if isinstance(aud, dict) else audience
+        yield f"data: {json.dumps({'log': f'[BUILD] Language: {lang_label} | Audience: {aud_label}'})}\n\n"
+        time.sleep(0.2)
+
+        # Check if already exists and not forcing
+        if not force:
+            conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+            row = conn.execute(
+                "SELECT id FROM skill_profiles WHERE lang=? AND audience=?", (lang, audience)
+            ).fetchone()
+            conn.close()
+            if row:
+                yield f"data: {json.dumps({'log': '[SKIP] Profile already exists — use Rebuild to overwrite.'})}\n\n"
+                yield f"data: {json.dumps({'status': 'done'})}\n\n"
+                return
+
+        yield f"data: {json.dumps({'log': '[BUILD] Researching tone, vocabulary, cultural references…'})}\n\n"
+        time.sleep(0.4)
+
+        # Build profile based on audience + language
+        aud_desc = aud.get("description","") if isinstance(aud,dict) else ""
+        aud_tips = aud.get("content_tips","") if isinstance(aud,dict) else ""
+        aud_niches = aud.get("best_niches","") if isinstance(aud,dict) else ""
+
+        tone_map = {
+            "de": "Enthusiastic, direct, scientific but accessible. Short punchy sentences.",
+            "en": "Conversational, energetic, slightly dramatic. Mix science with storytelling.",
+            "es": "Warm, expressive, immersive. Rich metaphors. Build emotional tension.",
+            "fr": "Elegant but accessible. Intellectual tone. Clear structure.",
+            "pt": "Dynamic, passionate, vivid imagery. Strong opening hooks.",
+            "ja": "Respectful but engaging. Mix formal and casual. Rich sensory detail.",
+            "ko": "High energy. Cultural relatability. Short sentences. Strong rhythm.",
+            "zh": "Clear, authoritative, vivid. Balance tradition with modern science.",
+        }
+        tone = tone_map.get(lang, f"Natural, engaging, adapted for Gen-Z science fans. Language: {lang_label}.")
+
+        slang_map = {
+            "de": "Krass, Alter, mega, voll krass, läuft, nice, 1000%, Digga, Wallah",
+            "en": "No cap, lowkey, goated, fr fr, mid, slay, W take, bussin, hits different",
+            "es": "Brutal, tío/tía, flipar, mola, mogollón, épico, brutal",
+            "pt": "Cara, maneiro, rola, bicho, daora, top demais, firmeza",
+            "ko": "대박, 진짜, 헐, 완전, 레전드, 핵심, 미쳤다",
+            "ja": "やばい, マジで, ガチ, 最高, えぐい, 確かに",
+        }
+        slang = slang_map.get(lang, f"Casual expressions appropriate for {lang_label}-speaking Gen Z science fans")
+
+        profile = {
+            "lang": lang, "audience": audience,
+            "lang_label": lang_label, "audience_label": aud_label,
+            "tone": tone,
+            "vocab": f"Science terms explained simply. Short paragraphs. Active verbs. Topics: {aud_niches}",
+            "slang": slang,
+            "cultural_refs": f"Relevant to {aud_label}: movies, games, viral moments, social media trends (2020-2025)",
+            "hooks": "Start with a jaw-dropping fact or paradox. Use rhetorical questions. Tease next section.",
+            "avoid": "Avoid: academic jargon without explanation, passive voice, long complex sentences, condescension",
+        }
+
+        yield f"data: {json.dumps({'log': '[SAVE] Writing profile to database…'})}\n\n"
+
+        # Save to DB
+        conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+        conn.execute("""
+            INSERT OR REPLACE INTO skill_profiles
+            (lang, audience, lang_label, audience_label, tone, vocab, slang, cultural_refs, hooks, avoid)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (lang, audience, lang_label, aud_label,
+              profile["tone"], profile["vocab"], profile["slang"],
+              profile["cultural_refs"], profile["hooks"], profile["avoid"]))
+        conn.commit()
+        conn.close()
+
+        yield f"data: {json.dumps({'log': f'[SAVE] Profile saved: {lang_label} × {aud_label}'})}\n\n"
+        time.sleep(0.1)
+        yield f"data: {json.dumps({'status': 'complete', 'profile': profile})}\n\n"
+
+    return Response(stream_with_context(generate()), content_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
 def _get_sources(eid):
@@ -520,7 +585,7 @@ def _auto_detect_phases(eid, ep):
             (eid,)
         ).fetchall()
         conn.close()
-        print(f"[trace] eid={eid} pending_rows={[r[0] for r in rows]}", file=sys.stderr)
+
 
         # Auto-init via subprocess if no rows
         if not rows:
@@ -541,34 +606,35 @@ def _auto_detect_phases(eid, ep):
                 except Exception:
                     pass
 
-        print(f"[trace] to_mark_done={to_mark_done}", file=sys.stderr)
         # Write via subprocess — separate process avoids WAL conflict
         for phase in to_mark_done:
-            r = mem_raw("pipeline", "set", eid, phase, "done")
-            print(f"[trace] set {phase} done: {r[:50]}", file=sys.stderr)
+            mem_raw("pipeline", "set", eid, phase, "done")
 
-        # Auto-progress: ONLY advance when we JUST marked something done AND
-        # nothing is already running (sequential pipeline — one step at a time)
-        if to_mark_done:
-            import time; time.sleep(0.15)  # let WAL checkpoint
-            conn3 = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
-            all_rows = conn3.execute(
-                "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id",
-                (eid,)
-            ).fetchall()
-            conn3.close()
+        # Auto-progress: advance to next phase when pipeline is idle
+        # Fires when: (a) something was JUST marked done, OR
+        #             (b) phases are done but nothing is running yet (pre-done case)
+        import time; time.sleep(0.15)
+        conn3 = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
+        all_rows = conn3.execute(
+            "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id",
+            (eid,)
+        ).fetchall()
+        conn3.close()
 
-            phase_status = {r[0]: r[1] for r in all_rows}
-            already_running = any(s == "running" for s in phase_status.values())
+        phase_status = {r[0]: r[1] for r in all_rows}
+        already_running = any(s == "running" for s in phase_status.values())
+        any_done = any(s == "done" for s in phase_status.values())
 
-            if not already_running:
-                # Find next phase that is still pending
-                next_phase = next(
-                    (ph for ph in PHASE_ORDER if phase_status.get(ph) == "pending"),
-                    None
-                )
-                if next_phase:
-                    mem_raw("pipeline", "set", eid, next_phase, "running")
+        should_advance = (to_mark_done and not already_running) or \
+                         (any_done and not already_running)
+
+        if should_advance:
+            next_phase = next(
+                (ph for ph in PHASE_ORDER if phase_status.get(ph) == "pending"),
+                None
+            )
+            if next_phase:
+                mem_raw("pipeline", "set", eid, next_phase, "running")
 
     except Exception as e:
         print(f"[auto-detect] ERROR eid={eid}: {type(e).__name__}: {e}", file=sys.stderr)
