@@ -5,16 +5,23 @@ Run: python app.py
 Open: http://localhost:5000
 """
 
-import sys, json, subprocess, os, time, queue, threading, uuid
+import sys, json, subprocess, os, time, queue, threading, uuid, sqlite3
 from pathlib import Path
 from flask import Flask, jsonify, request, send_from_directory, Response, stream_with_context
 
 BASE = Path(__file__).parent
 MEM  = [sys.executable, str(BASE / ".agent/skills/memory/scripts/memory.py")]
+DB   = BASE / ".agent/skills/memory/podcast_memory.db"
 UI   = BASE / "ui"
 
 app = Flask(__name__, static_folder=str(UI), static_url_path="")
 os.environ["PYTHONIOENCODING"] = "utf-8"
+
+def _db():
+    """Open a direct SQLite connection (no subprocess overhead)."""
+    conn = sqlite3.connect(str(DB), timeout=5)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 # ── SECURITY HEADERS ──────────────────────────────────────────────────────────
 @app.after_request
@@ -59,16 +66,22 @@ def index():
 
 @app.route("/api/languages")
 def get_languages():
-    langs = mem("language", "list")
-    if isinstance(langs, list) and langs:
-        return jsonify(langs)
-    # Fallback — strong CPM + viral reach (no sub-$5 CPM markets)
+    """Direct SQLite — no subprocess."""
+    try:
+        conn = _db()
+        rows = conn.execute("SELECT code, name, flag FROM languages ORDER BY name").fetchall()
+        conn.close()
+        if rows:
+            return jsonify([dict(r) for r in rows])
+    except Exception:
+        pass
+    # Fallback
     return jsonify([
-        {"code":"en","name":"English",    "flag":"🇬🇧"},  # US 158M listeners (#1), $15–$50 CPM
-        {"code":"es","name":"Spanish",    "flag":"🇪🇸"},  # LatAm fastest growth, US Hispanic $8–$20
-        {"code":"pt","name":"Portuguese", "flag":"🇧🇷"},  # Brazil 51.8M listeners, #3 market
-        {"code":"fr","name":"French",     "flag":"🇫🇷"},  # France + 300M African speakers, $10–$20
-        {"code":"de","name":"German",     "flag":"🇩🇪"},  # Strong EU podcast culture, $18–$30 CPM
+        {"code":"en","name":"English",    "flag":"🇬🇧"},
+        {"code":"es","name":"Spanish",    "flag":"🇪🇸"},
+        {"code":"pt","name":"Portuguese", "flag":"🇧🇷"},
+        {"code":"fr","name":"French",     "flag":"🇫🇷"},
+        {"code":"de","name":"German",     "flag":"🇩🇪"},
     ])
 
 
@@ -100,27 +113,30 @@ def get_audiences():
 
 @app.route("/api/episodes")
 def list_episodes():
-    raw = mem_raw("episode", "list")
-    episodes = []
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line: continue
-        import re
-        m = re.match(r"S(\d+)E(\d+)\s+\[([^\]]+)\]\s+(.+)", line)
-        if m:
-            s, e = int(m[1]), int(m[2])
-            ep = _ep_by_se(s, e)
-            if ep: episodes.append(ep)
-    return jsonify(episodes)
+    """Direct SQLite — no subprocess, no regex, no 200-iteration loop."""
+    try:
+        conn = _db()
+        rows = conn.execute(
+            "SELECT * FROM episodes ORDER BY season, episode"
+        ).fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        return jsonify([])  # Return empty list on error
 
 
 def _ep_by_se(season, episode):
-    for i in range(1, 200):
-        ep = mem("episode", "get", i)
-        if not isinstance(ep, dict): break
-        if ep.get("season") == season and ep.get("episode") == episode:
-            return ep
-    return None
+    """Direct SQLite lookup — no subprocess loop."""
+    try:
+        conn = _db()
+        row = conn.execute(
+            "SELECT * FROM episodes WHERE season=? AND episode=?",
+            (season, episode)
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
 
 
 @app.route("/api/episodes/<int:eid>")
@@ -411,9 +427,14 @@ def get_chars():
 
 @app.route("/api/styles")
 def get_styles():
-    TYPES = ["space","paranormal","military","technology","biology","consciousness","time","ancient","ocean","simulation","ai"]
-    styles = [s for t in TYPES for s in [mem("style","get",t)] if isinstance(s, dict)]
-    return jsonify({"styles": styles})
+    """Direct SQLite — was 11 sequential subprocesses, now one query."""
+    try:
+        conn = _db()
+        rows = conn.execute("SELECT * FROM visual_styles ORDER BY topic_type").fetchall()
+        conn.close()
+        return jsonify({"styles": [dict(r) for r in rows]})
+    except Exception:
+        return jsonify({"styles": []})
 
 @app.route("/api/topics")
 def get_topics():

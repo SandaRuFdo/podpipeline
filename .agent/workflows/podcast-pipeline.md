@@ -233,32 +233,37 @@ Read `transcript.txt` and create `$EP/5_deliverables/SLIDE_SOURCE.md`:
 
 ---
 
-## PHASE 6 — Generate 16:9 Visuals
+## PHASE 6 — Generate 16:9 Visuals (Parallel Batches)
 
-> 🎨 **IMAGE QUALITY RULE — MAXIMUM PRO:**  
-> The `generate_image` tool selects quality based on prompt specificity.  
+> 🎨 **IMAGE QUALITY RULE — MAXIMUM PRO:**
+> The `generate_image` tool selects quality based on prompt specificity.
 > **Ultra-detailed = Pro model. Vague = Fast model. Never be vague.**
 
-For each row in `SLIDE_SOURCE.md`, generate a cinematic image.
+> ⚡ **SPEED RULE — PARALLEL BATCHES:**
+> Fire **3–4 `generate_image` calls simultaneously** per batch, not one at a time.
+> Wait for each batch to finish, then fire the next batch.
+> This is 3–4× faster than sequential generation.
+
+### 6.1 Read the slide source and prepare all prompts
+
+Read `$EP/5_deliverables/SLIDE_SOURCE.md`. Write ALL prompts upfront before generating anything.
 
 **MAXIMUM QUALITY prompt template (mandatory for every single slide):**
 ```
-Ultra-wide cinematic 16:9 aspect ratio. Hyper-realistic, 8K resolution, shot on 
-RED MONSTRO cinema camera, 24mm anamorphic lens, f/1.8 bokeh. [Extremely specific scene: 
-every element, every light source, color temperature, time of day, weather, distance, 
-texture]. Masterful film-grade color grading — [specific color palette: e.g. 
-deep teal shadows, warm orange highlights, desaturated midtones]. 
-Volumetric atmospheric haze. Award-winning cinematography composition. 
-No text, no watermarks, no logos, no UI, no watermarks. 
-Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain, 
+Ultra-wide cinematic 16:9 aspect ratio. Hyper-realistic, 8K resolution, shot on
+RED MONSTRO cinema camera, 24mm anamorphic lens, f/1.8 bokeh. [Extremely specific scene:
+every element, every light source, color temperature, time of day, weather, distance,
+texture]. Masterful film-grade color grading — [specific color palette].
+Volumetric atmospheric haze. Award-winning cinematography composition.
+No text, no watermarks, no logos, no UI.
+Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain,
 flat colors, amateur, low quality.
 ```
 
 **Always describe light specifically:**
 - "Hard directional rim light from upper left, casting long shadows..."
-- "Soft diffused natural window light, golden hour glow..."  
+- "Soft diffused natural window light, golden hour glow..."
 - "Practical light from glowing screens, cool blue-green tones..."
-- "Drone-mounted LED array, clinical white, forensic clarity..."
 
 **Check visual style from memory:**
 ```powershell
@@ -266,17 +271,36 @@ flat colors, amateur, low quality.
 # e.g. military, space, biology, tech, paranormal
 ```
 
+### 6.2 Generate in parallel batches of 3–4
+
+```
+BATCH 1 (fire all at once, wait for all to finish):
+  → generate_image(slide01 prompt) ┐
+  → generate_image(slide02 prompt) ├── ALL FIRED SIMULTANEOUSLY
+  → generate_image(slide03 prompt) ┘
+
+BATCH 2 (fire all at once):
+  → generate_image(slide04 prompt) ┐
+  → generate_image(slide05 prompt) ├── ALL FIRED SIMULTANEOUSLY
+  → generate_image(slide06 prompt) ┘
+
+... continue until all slides done
+```
+
 Save all images to `$EP/4_visuals/` as `slide01_<desc>.png`, `slide02_<desc>.png`, etc.
 
-**MANDATORY STEP: Force 1920×1080 after every batch:**
+### 6.3 Force 1920×1080 (ONE batch run at the end)
+
 ```powershell
 $env:PYTHONIOENCODING="utf-8"
 python scripts/force_16x9.py "$EP/4_visuals/"
 ```
-This ffmpeg scale+pad step is **non-negotiable**. Every image in the pipeline must be exactly 1920×1080 before CapCut.
+
+> Run this **ONCE after all slides are generated** — not after every image.
+> This ffmpeg scale+pad step is non-negotiable. Every image must be exactly 1920×1080 before CapCut.
 
 ```powershell
-& $MEM log $EID visuals "N slides generated (PRO prompts) + force_16x9 → 1920x1080"
+& $MEM log $EID visuals "N slides generated in parallel batches + force_16x9 → 1920x1080"
 
 # ✅ Update UI dashboard after phase complete
 python scripts/update_phase.py $EID visuals done
