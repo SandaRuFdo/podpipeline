@@ -1,0 +1,51 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual Environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+
+# ── Database / User Data ─────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+episodes/
+!episodes/.gitkeep
+
+# ── Test Artifacts ───────────────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+
+# ── OS Junk ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── Secrets / Keys ───────────────────────────────────────────────────────────
+.env
+*.key
+secrets.json
+service_account*.json
+
+# ── Antigravity AI Artifacts ─────────────────────────────────────────────────
+.gemini/

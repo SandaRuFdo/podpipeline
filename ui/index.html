@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PodPipeline — Control Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+
+    <!-- GLOBAL SEARCH OVERLAY -->
+    <div id="search-overlay" class="search-overlay hidden">
+        <div class="search-modal">
+            <div class="search-input-wrap">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="Search episodes, topics, characters…"
+                    autocomplete="off" />
+                <kbd class="kbd">Esc</kbd>
+            </div>
+            <div id="search-results" class="search-results"></div>
+        </div>
+        <div class="search-backdrop"></div>
+    </div>
+
+    <!-- KEYBOARD SHORTCUTS PANEL -->
+    <div id="shortcuts-panel" class="shortcuts-panel hidden">
+        <div class="shortcuts-inner">
+            <div class="shortcuts-header">
+                <h3>⌨️ Keyboard Shortcuts</h3><button onclick="toggleShortcuts()">✕</button>
+            </div>
+            <div class="shortcuts-grid">
+                <div class="shortcut-row"><kbd>/</kbd> <span>Search</span></div>
+                <div class="shortcut-row"><kbd>N</kbd> <span>New Episode</span></div>
+                <div class="shortcut-row"><kbd>D</kbd> <span>Dashboard</span></div>
+                <div class="shortcut-row"><kbd>E</kbd> <span>Episodes</span></div>
+                <div class="shortcut-row"><kbd>A</kbd> <span>Analytics</span></div>
+                <div class="shortcut-row"><kbd>M</kbd> <span>Memory</span></div>
+                <div class="shortcut-row"><kbd>?</kbd> <span>This panel</span></div>
+                <div class="shortcut-row"><kbd>Esc</kbd> <span>Close / Back</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-icon">🎬</span>
+            <div>
+                <div class="logo-text">PodPipeline</div>
+                <div class="logo-sub">Production Control Center</div>
+            </div>
+        </div>
+        <div class="sidebar-search-btn" onclick="openSearch()">
+            <span>🔍</span> <span>Search…</span> <kbd class="kbd-sm">/</kbd>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#" class="nav-link active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="episodes"><span class="nav-icon">🎙️</span> Episodes</a></li>
+            <li><a href="#" class="nav-link" data-page="new-episode"><span class="nav-icon">➕</span> New Episode</a>
+            </li>
+            <li><a href="#" class="nav-link" data-page="analytics"><span class="nav-icon">📈</span> Analytics</a></li>
+            <li><a href="#" class="nav-link" data-page="memory"><span class="nav-icon">🧠</span> Memory</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <div class="server-status"><span class="status-dot"></span><span>Server Active</span></div>
+            <button class="shortcut-trigger" onclick="toggleShortcuts()" title="Keyboard shortcuts (?)">⌨️</button>
+        </div>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- DASHBOARD -->
+        <section class="page active" id="page-dashboard">
+            <div class="page-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p class="page-sub">Your podcast production nerve center</p>
+                </div>
+                <div class="header-actions">
+                    <div id="lang-summary" class="lang-pill-group"></div>
+                </div>
+            </div>
+            <div class="stats-grid" id="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🎙️</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="sv-eps">—</div>
+                        <div class="stat-label">Episodes</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🔗</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="sv-src">—</div>
+                        <div class="stat-label">Sources</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎧</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="sv-aud">—</div>
+                        <div class="stat-label">Audio Hours</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="sv-qual">—</div>
+                        <div class="stat-label">Avg Quality</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🌐</div>
+                    <div class="stat-body">
+                        <div class="stat-value" id="sv-langs">—</div>
+                        <div class="stat-label">Languages</div>
+                    </div>
+                </div>
+            </div>
+            <div class="row-two">
+                <div class="card" style="flex:2">
+                    <div class="card-header">
+                        <h2>Recent Episodes</h2><button class="btn-ghost" onclick="navigate('new-episode')">+
+                            New</button>
+                    </div>
+                    <div class="ep-filters">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="planned">Planned</button>
+                        <button class="filter-btn" data-filter="complete">Complete</button>
+                    </div>
+                    <div id="recent-ep-list" class="episode-list">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+                <div class="card suggest-card" style="flex:1">
+                    <div class="card-header">
+                        <h2>🎯 Next Topic</h2>
+                    </div>
+                    <div id="suggest-box" class="suggest-body">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EPISODES -->
+        <section class="page" id="page-episodes">
+            <div class="page-header">
+                <div>
+                    <h1>All Episodes</h1>
+                </div>
+                <div class="header-actions">
+                    <select id="ep-filter-lang" class="select-sm">
+                        <option value="">All Languages</option>
+                    </select>
+                    <select id="ep-filter-status" class="select-sm">
+                        <option value="">All Statuses</option>
+                        <option>planned</option>
+                        <option>complete</option>
+                        <option>failed</option>
+                    </select>
+                    <button class="btn-primary" onclick="navigate('new-episode')">+ New Episode</button>
+                </div>
+            </div>
+            <div id="episodes-grid" class="episodes-grid">
+                <div class="loading-spinner">Loading…</div>
+            </div>
+        </section>
+
+        <!-- NEW EPISODE -->
+        <section class="page" id="page-new-episode">
+            <div class="page-header">
+                <h1>New Episode</h1>
+                <p class="page-sub">Set up a new podcast episode from scratch</p>
+            </div>
+            <div class="card form-card">
+
+                <form id="new-episode-form">
+
+                    <div class="form-step-label">① Episode Info</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Season</label>
+                            <input type="number" name="season" value="1" min="1" required />
+                        </div>
+                        <div class="form-group">
+                            <label>Episode #</label>
+                            <input type="number" name="episode" min="1" required placeholder="e.g. 2" />
+                        </div>
+                        <div class="form-group">
+                            <label>Folder Slug <span class="hint">(no spaces)</span></label>
+                            <input type="text" name="slug" required placeholder="e.g. Dark_Matter" />
+                        </div>
+                    </div>
+
+                    <div class="form-step-label">② Output Language</div>
+                    <div class="form-row">
+                        <div class="form-group wide">
+                            <div class="lang-picker-wrap">
+                                <div class="lang-selected" id="lang-selected">🇩🇪 German</div>
+                                <input type="hidden" name="output_language" id="lang-code-input" value="de" />
+                                <input type="hidden" name="language_name" id="lang-name-input" value="German" />
+                                <div class="lang-dropdown hidden" id="lang-dropdown"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-step-label">③ Target Audience</div>
+
+                    <div id="audience-card-grid" class="audience-card-grid">
+                        <div class="loading-spinner">Loading audience intelligence…</div>
+                    </div>
+                    <input type="hidden" name="target_audience" id="target-audience-input" value="finance_listeners" />
+                    <div id="audience-tips-box" class="audience-tips-box hidden"></div>
+
+                    <!-- SKILL PROFILE STATUS BADGE -->
+                    <div id="skill-profile-status" class="skill-profile-status hidden">
+                        <span id="skill-profile-icon">⚡</span>
+                        <span id="skill-profile-msg">Checking writing profile…</span>
+                        <button type="button" id="skill-profile-btn" class="btn-ghost-sm hidden"
+                            onclick="buildSkillProfile()">Build Now</button>
+                    </div>
+
+                    <div class="form-step-label" style="margin-top:24px">④ Episode Content</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Episode Title (Target Language)</label>
+                            <input type="text" name="title_de" required placeholder="Title in your chosen language" />
+                        </div>
+                        <div class="form-group">
+                            <label>Title (English) <span class="hint">optional</span></label>
+                            <input type="text" name="title_en" placeholder="English reference title" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Topic Description <span class="hint">(English — used for research)</span></label>
+                        <input type="text" name="topic" required
+                            placeholder="e.g. dark matter physics mystery universe" />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary btn-lg" id="create-btn">🚀 Create Episode</button>
+                    </div>
+                </form>
+                <!-- LIVE TERMINAL OUTPUT -->
+                <div id="live-terminal" class="live-terminal hidden">
+                    <div class="terminal-header">
+                        <span class="terminal-title">⚡ Live Output</span>
+                        <span id="terminal-status" class="terminal-badge running">Running</span>
+                    </div>
+                    <div id="terminal-body" class="terminal-body"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ANALYTICS -->
+        <section class="page" id="page-analytics">
+            <div class="page-header">
+                <h1>Analytics</h1>
+                <p class="page-sub">Performance trends and topic intelligence</p>
+            </div>
+            <div class="analytics-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>📊 Project Stats</h2>
+                    </div>
+                    <div id="analytics-stats" class="stats-detail">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🎯 Topic Suggestion</h2>
+                    </div>
+                    <div id="analytics-suggest" class="suggest-body">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-16">
+                <div class="card-header">
+                    <h2>📝 Quality Feedback</h2>
+                </div>
+                <form id="quality-form" class="quality-form">
+                    <div class="form-row">
+                        <div class="form-group"><label>Episode ID</label><input type="number" name="episode_id"
+                                placeholder="1" min="1" required /></div>
+                        <div class="form-group"><label>Category</label>
+                            <select name="category">
+                                <option>pacing</option>
+                                <option>script</option>
+                                <option>audio</option>
+                                <option>visuals</option>
+                                <option>engagement</option>
+                                <option>general</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Rating</label><input type="number" name="rating" min="1" max="10"
+                                value="7" /></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>✅ What worked</label><input type="text" name="worked"
+                                placeholder="e.g. Short cold open gripped audience" /></div>
+                        <div class="form-group"><label>❌ What failed</label><input type="text" name="failed"
+                                placeholder="e.g. Too long Act 2" /></div>
+                        <div class="form-group"><label>💡 Improve</label><input type="text" name="improve"
+                                placeholder="e.g. Keep Act 1 under 3 min" /></div>
+                    </div>
+                    <button type="submit" class="btn-primary">Save Feedback</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- MEMORY -->
+        <section class="page" id="page-memory">
+            <div class="page-header">
+                <h1>Memory</h1>
+                <p class="page-sub">Characters, visual styles, covered topics</p>
+            </div>
+            <div class="memory-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🎭 Characters</h2>
+                    </div>
+                    <div id="characters-list" class="char-list">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h2>🎨 Visual Styles</h2>
+                    </div>
+                    <div id="styles-list" class="styles-list">
+                        <div class="loading-spinner">Loading…</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-16">
+                <div class="card-header">
+                    <h2>📚 Covered Topics</h2>
+                </div>
+                <div id="topics-list" class="topics-list">
+                    <div class="loading-spinner">Loading…</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- EPISODE DETAIL -->
+        <section class="page" id="page-episode-detail">
+            <div class="detail-topbar">
+                <button class="btn-ghost back-btn" onclick="navigate('episodes')">← Back</button>
+                <div id="detail-actions" class="detail-actions"></div>
+            </div>
+            <div id="episode-detail-content">
+                <div class="loading-spinner">Loading…</div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+
+</html>
