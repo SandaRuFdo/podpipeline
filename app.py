@@ -255,6 +255,38 @@ def init_pipeline(eid):
     return jsonify({"ok": True})
 
 
+@app.route("/api/episodes/<int:eid>/open-folder", methods=["POST"])
+def open_folder(eid):
+    """Open the episode deliverables folder in the system file explorer."""
+    ep = mem("episode", "get", eid)
+    if not ep:
+        return jsonify({"error": "Episode not found"}), 404
+
+    ep_path = ep.get("ep_path", "")
+    if not ep_path:
+        return jsonify({"error": "No episode path set"}), 400
+
+    # Try deliverables folder first, fall back to episode root
+    base = Path(ep_path)
+    deliverables = base / "5_deliverables"
+    target = deliverables if deliverables.is_dir() else base
+
+    if not target.is_dir():
+        return jsonify({"error": f"Folder not found: {target}"}), 404
+
+    try:
+        import platform
+        if platform.system() == "Windows":
+            os.startfile(str(target))
+        elif platform.system() == "Darwin":
+            subprocess.Popen(["open", str(target)])
+        else:
+            subprocess.Popen(["xdg-open", str(target)])
+        return jsonify({"ok": True, "path": str(target)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── SOURCES ───────────────────────────────────────────────────────────────────
 
 @app.route("/api/episodes/<int:eid>/sources")

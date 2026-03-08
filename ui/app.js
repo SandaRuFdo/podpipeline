@@ -464,6 +464,16 @@ async function loadEpisodeDetail(eid) {
           <div class="card-header"><h2>🔄 Pipeline Status</h2></div>
           <div class="pipeline-track" id="pipeline-track-${ep.id}">
             ${phases.map(p => phaseRow(ep.id, p)).join("")}
+            ${phases.length && phases.every(p => p.status === "done" || p.status === "skipped") ? `
+              <div class="phase-row done" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.08));border:1px solid rgba(16,185,129,0.3);margin-top:6px;cursor:pointer" onclick="openDeliverables(${ep.id})">
+                <span class="phase-icon" style="font-size:22px">📂</span>
+                <div style="flex:1">
+                  <div class="phase-name" style="color:#10b981;font-weight:600">Open Deliverables</div>
+                  <div class="phase-desc">Open output folder in file explorer</div>
+                </div>
+                <span class="phase-badge done" style="background:#10b981;color:#fff">✓ Complete</span>
+              </div>
+            ` : ""}
           </div>
         </div>
         <div class="card">
@@ -573,6 +583,15 @@ async function markPhase(evt, eid, phase, status) {
   await api(`/api/episodes/${eid}/phase`, { method: "POST", body: JSON.stringify({ phase, status }) });
   toast(`${phase.replace(/_/g, " ")} → ${status}`);
   loadEpisodeDetail(eid);
+}
+
+async function openDeliverables(eid) {
+  const r = await api(`/api/episodes/${eid}/open-folder`, { method: "POST" });
+  if (r?.ok) {
+    toast("📂 Opened deliverables folder", "success");
+  } else {
+    toast(r?.error || "Could not open folder", "error");
+  }
 }
 
 async function initPipeline(eid) {
