@@ -1380,6 +1380,39 @@ body {
   color: var(--text-mid);
 }
 
+/* ── PLATFORM TAGS ────────────────────────────────────────────────── */
+.audience-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.platform-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  font-size: 11.5px;
+  color: var(--text-mid);
+  transition: border-color .15s, background .15s;
+  white-space: nowrap;
+}
+
+.platform-tag:hover {
+  border-color: var(--accent);
+  background: var(--bg4);
+  color: var(--text);
+}
+
+.platform-tag svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
 /* ── GLOBAL SEARCH OVERLAY ────────────────────────────────────────── */
 .search-overlay {
   position: fixed;
