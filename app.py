@@ -245,7 +245,8 @@ def create_episode():
 
     def run():
         cmd = [
-            sys.executable, str(BASE / "new_episode.py"),
+            sys.executable, str(BASE / "core" / "new_episode.py"),
+
             "--season", str(d["season"]), "--episode", str(d["episode"]),
             "--slug", d["slug"], "--title-de", d["title_de"],
             "--topic", d["topic"],
