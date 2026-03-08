@@ -349,22 +349,8 @@ notebooklm source list --json   # Check all "status": "ready"
 
 > ⚠️ Do NOT add the German script here. This notebook is English-only for cinematic generation.
 
-### 8.3 Generate cinematic video
-
 ```powershell
-# Generate the AI cinematic video (English)
-notebooklm generate video "<topic> — cinematic visual explainer" \
-  --style auto --retry 3 --no-wait --json
-# → Save artifact_id
-
-# This takes 15-45 min — runs in background while you work on other things
-# Check status later:
-notebooklm artifact wait <artifact_id> --timeout 2700
-
-# Download when ready
-notebooklm download video "$EP/5_deliverables/cinematic.mp4"
-
-& $MEM log $EID cinematic "Cinematic video generated (English, separate notebook)"
+& $MEM log $EID cinematic "Cinematic notebook created with English sources"
 
 # ✅ Update UI dashboard
 python scripts/update_phase.py $EID cinematic done
