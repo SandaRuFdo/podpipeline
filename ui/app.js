@@ -16,6 +16,17 @@ const PHASE_DESC = {
 };
 const PALETTE = { "deep-blue": "#1e40af", "purple": "#7c3aed", "black": "#111", "gold": "#d97706", "navy": "#1e3a5f", "cyan": "#0891b2", "amber": "#f59e0b", "dark-grey": "#374151", "green": "#15803d", "teal": "#0f766e", "orange": "#c2410c", "neon-blue": "#2563eb", "white": "#e5e7eb", "red": "#b91c1c", "violet": "#6d28d9" };
 
+// ── FLAG IMAGES ────────────────────────────────────────────────────────────────
+// Map lang codes to ISO 3166-1 alpha-2 for flagcdn.com (Windows has no native flag emoji)
+const LANG_TO_COUNTRY = { en: "gb", de: "de", fr: "fr", pt: "br", es: "es" };
+function flagImg(langCode, size = 20) {
+  const cc = LANG_TO_COUNTRY[langCode] || langCode;
+  return `<img src="https://flagcdn.com/${size}x${Math.round(size * 0.75)}/${cc}.png"
+    srcset="https://flagcdn.com/${size * 2}x${Math.round(size * 0.75 * 2)}/${cc}.png 2x"
+    width="${size}" height="${Math.round(size * 0.75)}"
+    alt="${langCode}" style="border-radius:2px;vertical-align:middle;display:inline-block;margin-right:4px">`;
+}
+
 // Global state
 let _languages = [];
 let _audiences = [];
@@ -88,7 +99,7 @@ function renderLangOptions(filter = "") {
   const existing = dd.querySelector("input");
   const items = _languages
     .filter(l => !filter || l.name.toLowerCase().includes(filter.toLowerCase()) || l.code.includes(filter))
-    .map(l => `<div class="lang-option" data-code="${l.code}" data-name="${l.name}" data-flag="${l.flag}" onclick="selectLang('${l.code}','${l.name}','${l.flag}')">${l.flag} ${l.name} <small style="color:var(--text-dim);margin-left:4px">${l.code}</small></div>`)
+    .map(l => `<div class="lang-option" data-code="${l.code}" data-name="${l.name}" onclick="selectLang('${l.code}','${l.name}')"> ${flagImg(l.code)} ${l.name} <small style="color:var(--text-dim);margin-left:4px">${l.code}</small></div>`)
     .join("");
   dd.innerHTML = "";
   if (existing) dd.appendChild(existing);
@@ -97,8 +108,8 @@ function renderLangOptions(filter = "") {
 
 window.filterLangs = function (val) { renderLangOptions(val); };
 
-window.selectLang = function (code, name, flag) {
-  document.getElementById("lang-selected").textContent = `${flag} ${name}`;
+window.selectLang = function (code, name) {
+  document.getElementById("lang-selected").innerHTML = `${flagImg(code)} ${name}`;
   document.getElementById("lang-code-input").value = code;
   document.getElementById("lang-name-input").value = name;
   document.getElementById("lang-dropdown").classList.add("hidden");
@@ -279,7 +290,7 @@ async function loadDashboard() {
     langSummary.innerHTML = Object.entries(counts).map(([k, c]) => {
       const [code, name] = k.split(":");
       const lang = _languages.find(l => l.code === code) || {};
-      return `<span class="lang-pill">${lang.flag || "🌐"} ${name} <strong>${c}</strong></span>`;
+      return `<span class="lang-pill">${flagImg(lang.code)} ${name} <strong>${c}</strong></span>`;
     }).join("");
   }
 
@@ -304,7 +315,7 @@ function epRow(ep) {
   return `<div class="ep-row" data-eid="${ep.id}">
     <span class="ep-code">${code}</span>
     <span class="ep-title">${ep.title_de || "—"}</span>
-    <span class="ep-lang-pill">${lang.flag || "🌐"}</span>
+    <span class="ep-lang-pill">${flagImg(lang ? lang.code : ep.output_language || 'en')}</span>
     <span class="ep-status ${st}">${st}</span>
   </div>`;
 }
@@ -450,7 +461,7 @@ async function loadEpisodeDetail(eid) {
   content.innerHTML = `
     <div class="detail-header">
       <div>
-        <div class="detail-code">${code} <span class="lang-pill">${lang.flag || "🌐"} ${ep.language_name || "German"}</span></div>
+        <div class="detail-code">${code} <span class="lang-pill">${flagImg(ep.output_language || 'en')} ${ep.language_name || "German"}</span></div>
         <div class="detail-title">${ep.title_de || "—"}</div>
         <div class="detail-topic">${ep.topic || ""}</div>
       </div>
