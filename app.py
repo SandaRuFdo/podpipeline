@@ -250,6 +250,8 @@ def create_episode():
             "--season", str(d["season"]), "--episode", str(d["episode"]),
             "--slug", d["slug"], "--title-de", d["title_de"],
             "--topic", d["topic"],
+            "--force",  # always overwrite from web UI
+
         ]
         if d.get("title_en"): cmd += ["--title-en", d["title_en"]]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -459,9 +461,13 @@ if __name__ == "__main__":
         WSGIRequestHandler.sys_version = ""
     except ImportError:
         pass
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-    print("\n  🎬 Podcast Pipeline UI")
-    print("  ─────────────────────────────────")
+    print("\n  [PodPipeline] Podcast Pipeline UI")
+    print("  ---------------------------------")
     print("  Open: http://localhost:5000")
     print("  Stop: Ctrl+C\n")
     app.run(debug=False, port=5000, host="127.0.0.1", threaded=True)
+
