@@ -316,6 +316,62 @@ python scripts/update_phase.py $EID deliverables done
 
 ---
 
+## PHASE 8 — Cinematic Video (English, Background)
+
+> 🎬 **This uses a SEPARATE notebook** with English sources ONLY.
+> The cinematic video is an English-language visual companion — NOT the podcast itself.
+> Start this right after Phase 7 so it generates in the background.
+
+### 8.1 Create cinematic notebook
+
+```powershell
+$env:PYTHONIOENCODING="utf-8"
+
+# Create a SEPARATE notebook — English sources only
+notebooklm create "Cinematic - <topic>" --json
+# → Save notebook ID as $CIN_NB
+notebooklm use <cin_notebook_id>
+```
+
+### 8.2 Add ONLY English sources
+
+```powershell
+# Add the English research sources from Phase 2
+# These are the YouTube transcripts, Wikipedia articles, etc.
+notebooklm source add "$EP/1_research/sources/<english_transcript>.txt" --json
+notebooklm source add "https://en.wikipedia.org/wiki/<topic>" --json
+# Add any other English URLs used during research
+notebooklm source add "<english_source_url>" --json
+
+# Wait for sources to be ready
+notebooklm source list --json   # Check all "status": "ready"
+```
+
+> ⚠️ Do NOT add the German script here. This notebook is English-only for cinematic generation.
+
+### 8.3 Generate cinematic video
+
+```powershell
+# Generate the AI cinematic video (English)
+notebooklm generate video "<topic> — cinematic visual explainer" \
+  --style auto --retry 3 --no-wait --json
+# → Save artifact_id
+
+# This takes 15-45 min — runs in background while you work on other things
+# Check status later:
+notebooklm artifact wait <artifact_id> --timeout 2700
+
+# Download when ready
+notebooklm download video "$EP/5_deliverables/cinematic.mp4"
+
+& $MEM log $EID cinematic "Cinematic video generated (English, separate notebook)"
+
+# ✅ Update UI dashboard
+python scripts/update_phase.py $EID cinematic done
+```
+
+---
+
 ## FINAL OUTPUT STRUCTURE
 
 ```
