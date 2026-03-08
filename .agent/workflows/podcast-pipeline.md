@@ -95,33 +95,48 @@ python scripts/update_phase.py $EID research done
 
 ---
 
-## PHASE 3 — Script Writing (German, Gen Z, Nova + Max)
+## PHASE 3 — Script Writing (Profile-Driven)
 
 > Read the English sources from `$EP/1_research/sources/` to deeply understand the topic.
-> Then write an amazing German script — this is where the magic happens.
+> Then write a script guided by the matching **skill profile** for this episode's language + audience.
 
-### 3.1 Load memory context for consistency
+### 3.1 Load writing profile + memory context
 
 ```powershell
+# Load the tailored writing profile for this episode's language × audience
+# This outputs tone, slang, vocab, cultural refs, hooks, and avoid-list
+& $MEM profile context $LANG $AUDIENCE
+# Example: & $MEM profile context de gen_z
+
+# Load episode memory for character consistency
 & $MEM context $EID
 ```
 
-### 3.2 Write the German script
+> **The profile context IS the writing directive.** It tells you exactly:
+> - **How to sound** (tone & voice)
+> - **What slang to use** (expressions the audience recognizes)
+> - **What terms to use** (vocab adapted to audience knowledge level)
+> - **What to reference** (shows, creators, memes the audience knows)
+> - **How to hook them** (attention strategies for that audience)
+> - **What kills it** (things that lose engagement for this specific audience)
 
-Use **German SciFi Podcast Director** skill. Save to `$EP/2_script/SCRIPT_DE.md`:
+### 3.2 Write the script
+
+Use **German SciFi Podcast Director** skill + the loaded profile. Save to `$EP/2_script/SCRIPT_$LANG.md`:
 
 - **Structure:** Cold Open → Theme Intro → Act 1 → Act 2 (Twist) → Act 3 → Outro
-- **Tone:** Nova (storyteller) + Max (reactor) — casual German, Gen Z analogies
+- **Tone:** As defined in the skill profile (NOT hardcoded)
 - **Length:** 15–25 minutes of dialogue
-- **No „Willkommen bei..."** — start mid-action
+- **Start mid-action** — no generic intros
 - **Use English sources as reference** — adapt, don't translate
+- **Weave in** the profile's slang, cultural refs, and hook patterns naturally
 
 ### 3.3 Write English translation
 
 Save to `$EP/2_script/SCRIPT_EN.md` — section-by-section for user review.
 
 ```powershell
-& $MEM log $EID script "Script written"
+& $MEM log $EID script "Script written with profile: $LANG × $AUDIENCE"
 
 # ✅ Update UI dashboard after phase complete
 python scripts/update_phase.py $EID script done

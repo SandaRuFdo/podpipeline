@@ -325,76 +325,60 @@ def audience_get(key):
 
 # ── SKILL PROFILES ────────────────────────────────────────────────────────────
 
-def skill_profile_get(lang_code, audience_key):
-    """Return existing writing profile for lang+audience combo, or None."""
+def skill_profile_get(lang, audience):
+    """Return writing profile for lang+audience combo from the seeded profiles."""
     db = get_db()
     row = db.execute(
-        "SELECT * FROM skill_profiles WHERE lang_code=? AND audience_key=?",
-        (lang_code, audience_key)
+        "SELECT * FROM skill_profiles WHERE lang=? AND audience=?",
+        (lang, audience)
     ).fetchone()
     db.close()
-    if not row:
-        return None
-    d = dict(row)
-    import json
-    for f in ("slang_phrases", "cultural_refs", "hook_patterns", "taboos"):
-        try:
-            d[f] = json.loads(d[f]) if d[f] else []
-        except Exception:
-            pass
-    return d
-
-
-def skill_profile_set(lang_code, audience_key, lang_label, audience_label,
-                      tone, vocabulary, slang_phrases, cultural_refs,
-                      writing_style, hook_patterns, taboos,
-                      research_notes="", research_sources=""):
-    """Upsert a writing profile for a lang+audience combo."""
-    import json
-    pid = f"{lang_code}_{audience_key}"
-    db = get_db()
-    db.execute("""
-        INSERT INTO skill_profiles
-            (id,lang_code,audience_key,lang_label,audience_label,
-             tone,vocabulary,slang_phrases,cultural_refs,
-             writing_style,hook_patterns,taboos,
-             research_notes,research_sources,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
-        ON CONFLICT(lang_code,audience_key) DO UPDATE SET
-            lang_label=excluded.lang_label,
-            audience_label=excluded.audience_label,
-            tone=excluded.tone, vocabulary=excluded.vocabulary,
-            slang_phrases=excluded.slang_phrases,
-            cultural_refs=excluded.cultural_refs,
-            writing_style=excluded.writing_style,
-            hook_patterns=excluded.hook_patterns,
-            taboos=excluded.taboos,
-            research_notes=excluded.research_notes,
-            research_sources=excluded.research_sources,
-            updated_at=datetime('now')
-    """, (
-        pid, lang_code, audience_key, lang_label, audience_label,
-        tone, vocabulary,
-        json.dumps(slang_phrases, ensure_ascii=False),
-        json.dumps(cultural_refs, ensure_ascii=False),
-        writing_style,
-        json.dumps(hook_patterns, ensure_ascii=False),
-        json.dumps(taboos, ensure_ascii=False),
-        research_notes, research_sources
-    ))
-    db.commit(); db.close()
-    return pid
+    return dict(row) if row else None
 
 
 def skill_profile_list():
     """List all saved skill profiles."""
     db = get_db()
     rows = db.execute(
-        "SELECT id,lang_code,audience_key,lang_label,audience_label,tone,created_at,updated_at "
-        "FROM skill_profiles ORDER BY lang_code,audience_key"
+        "SELECT lang, audience, lang_label, audience_label, "
+        "substr(tone,1,60) AS tone_preview, created_at "
+        "FROM skill_profiles ORDER BY lang, audience"
     ).fetchall()
     db.close()
     return [dict(r) for r in rows]
+
+
+def skill_profile_context(lang, audience):
+    """Build a ready-to-use writing directive from the skill profile.
+    
+    Returns a formatted string that can be injected directly into
+    script-writing prompts to guide tone, slang, cultural references, etc.
+    """
+    p = skill_profile_get(lang, audience)
+    if not p:
+        return f"[NO PROFILE] No writing profile found for {lang}/{audience}. Use default style."
+    
+    return f"""# WRITING PROFILE: {p.get('lang_label','?')} × {p.get('audience_label','?')}
+
+## Tone & Voice
+{p.get('tone', 'N/A')}
+
+## Slang & Expressions (USE THESE naturally in dialogue)
+{p.get('slang', 'N/A')}
+
+## Vocabulary & Terminology
+{p.get('vocab', 'N/A')}
+
+## Cultural References (weave these in)
+{p.get('cultural_refs', 'N/A')}
+
+## Hook Strategies
+{p.get('hooks', 'N/A')}
+
+## AVOID (these kill engagement for this audience)
+{p.get('avoid', 'N/A')}
+"""
+
 
 
 def _fts(db, type_, eid, title, content, tags=""):
@@ -1066,6 +1050,27 @@ def main():
 
     elif cmd == "context":
         print(build_context(int(a[2]) if len(a)>2 else None))
+
+    elif cmd == "profile":
+        sub = a[2]
+        if sub == "get" and len(a) >= 5:
+            p = skill_profile_get(a[3], a[4])
+            if p:
+                print(json.dumps(p, indent=2, ensure_ascii=False, default=str))
+            else:
+                print(f"No profile found for {a[3]}/{a[4]}")
+        elif sub == "list":
+            profiles = skill_profile_list()
+            for p in profiles:
+                print(f"  {p['lang']:3} × {p['audience']:20} | {p['lang_label']:12} × {p['audience_label']:20} | {p['tone_preview']}…")
+            print(f"\n  Total: {len(profiles)} profiles")
+        elif sub == "context" and len(a) >= 5:
+            ctx = skill_profile_context(a[3], a[4])
+            print(ctx)
+        else:
+            print("Usage: profile get <lang> <audience>")
+            print("       profile list")
+            print("       profile context <lang> <audience>")
 
     else:
         print(f"Unknown: {cmd}\n{HELP}")

@@ -66,6 +66,11 @@ $MEM log 1 research "Added YouTube source" "Infographics Show transcript"
 $MEM search "nuclear weapons"
 $MEM search "Nova" character
 
+# Skill Profiles (30 language × audience combos)
+$MEM profile list                         # Show all 30 profiles
+$MEM profile get de gen_z                 # Full JSON for one profile
+$MEM profile context de gen_z             # Ready-to-use writing directive
+
 # Build AI Context (feed to prompt)
 $MEM context        # All memory
 $MEM context 1      # With episode 1 focus
@@ -82,7 +87,12 @@ $MEM topic check "<topic>"
 $MEM char get Nova
 $MEM char get Max
 
-# 3. Get quality learnings from previous episodes
+# 3. Load writing profile for this episode's language × audience
+$MEM profile context <lang> <audience>
+# e.g. $MEM profile context de gen_z
+# → Outputs tone, slang, vocab, cultural refs, hooks, avoid-list
+
+# 4. Get quality learnings from previous episodes
 $MEM context
 ```
 
