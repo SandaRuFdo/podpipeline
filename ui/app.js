@@ -486,7 +486,7 @@ async function loadEpisodeDetail(eid) {
             <div class="meta-item"><div class="meta-key">Season</div><div class="meta-val">${ep.season}</div></div>
             <div class="meta-item"><div class="meta-key">Episode</div><div class="meta-val">${ep.episode}</div></div>
             <div class="meta-item"><div class="meta-key">Language</div><div class="meta-val">${lang.flag || "🌐"} ${ep.language_name || "German"}</div></div>
-            <div class="meta-item"><div class="meta-key">Audio</div><div class="meta-val">${ep.audio_dur ? Math.round(ep.audio_dur / 60) + "min" : "—"}</div></div>
+            <div class="meta-item"><div class="meta-key">Audio</div><div class="meta-val">${ep.audio_dur ? (() => { const m = Math.floor(ep.audio_dur / 60); const s = ep.audio_dur % 60; return `${m}:${String(s).padStart(2, '0')}`; })() : '—'}</div></div>
           </div>
           ${ep.notebook_id ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px">📓 ${ep.notebook_id.slice(0, 32)}…</div>` : ""}
           ${ep.ep_path ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px">📁 ${ep.ep_path}</div>` : ""}
@@ -597,7 +597,7 @@ async function loadAnalytics() {
       ["Episodes", `${s.episodes_complete}/${s.episodes_total} complete`],
       ["Sources", s.sources_total],
       ["Topics covered", s.topics_covered],
-      ["Audio produced", `${s.total_audio_hours}h`],
+      ["Audio produced", s.total_audio_hours != null ? (s.total_audio_hours < 1 ? `${Math.round(s.total_audio_hours * 60)}min` : `${s.total_audio_hours}h`) : "—"],
       ["Avg quality", s.avg_quality_score != null ? `${s.avg_quality_score}/10` : "N/A"],
       ["Top category", s.top_category || "N/A"],
     ].map(([k, v]) => `<div class="stat-row"><span class="stat-row-label">${k}</span><span class="stat-row-value">${v}</span></div>`).join("");
