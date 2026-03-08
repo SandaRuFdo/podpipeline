@@ -299,11 +299,76 @@ def search():
 
 @app.route("/api/stats")
 def get_stats():
-    return jsonify({
-        "stats":     mem("stats")     if isinstance(mem("stats"), dict)     else {},
-        "suggest":   mem("suggest")   if isinstance(mem("suggest"), dict)   else {},
-        "analytics": mem("analytics","summary") if isinstance(mem("analytics","summary"), dict) else {}
-    })
+    import sqlite3
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+    stats = {}
+    suggest = {}
+    analytics_data = {}
+
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+            conn.row_factory = sqlite3.Row
+
+            # ── Episode counts ──
+            ep_rows = conn.execute("SELECT status FROM episodes").fetchall()
+            stats["episodes_total"]    = len(ep_rows)
+            stats["episodes_complete"] = sum(1 for r in ep_rows if r["status"] == "complete")
+
+            # ── Sources ──
+            stats["sources_total"] = conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+
+            # ── Topics (column: 'topic', not 'name') ──
+            topic_rows = conn.execute("SELECT topic, category FROM topics ORDER BY created_at DESC").fetchall()
+            stats["topics_covered"] = len(topic_rows)
+
+            # ── Audio duration (column: audio_dur in seconds) ──
+            dur_row = conn.execute("SELECT audio_dur FROM episodes WHERE audio_dur IS NOT NULL").fetchone()
+            dur = int(dur_row["audio_dur"]) if dur_row else 0
+            stats["total_audio_hours"] = round(dur / 3600, 1) if dur else 0
+
+            # ── Quality (table may not exist yet — skip gracefully) ──
+            try:
+                q_rows = conn.execute("SELECT rating FROM quality_ratings WHERE rating IS NOT NULL").fetchall()
+                if q_rows:
+                    avg = sum(r["rating"] for r in q_rows) / len(q_rows)
+                    stats["avg_quality_score"] = round(avg, 1)
+                else:
+                    stats["avg_quality_score"] = None
+            except Exception:
+                stats["avg_quality_score"] = None
+
+            # ── Top category ──
+            cat_row = conn.execute("""
+                SELECT category, COUNT(*) as cnt FROM topics
+                GROUP BY category ORDER BY cnt DESC LIMIT 1
+            """).fetchone()
+            stats["top_category"] = cat_row["category"].title() if cat_row else None
+
+            # ── Suggest: next uncovered category ──
+            covered_cats = {r["category"] for r in topic_rows}
+            all_cats = ["space", "paranormal", "military", "technology", "biology",
+                        "consciousness", "time", "ancient", "ocean", "simulation", "ai", "geopolitics"]
+            uncovered = [c for c in all_cats if c not in covered_cats]
+            suggest["suggestion"] = uncovered[0].title() if uncovered else "More Geopolitics"
+            suggest["uncovered_categories"] = [c.title() for c in uncovered[:6]]
+            suggest["top_performing"] = []
+
+            # ── Analytics summary ──
+            cat_rows = conn.execute("""
+                SELECT category, COUNT(*) as cnt FROM topics
+                GROUP BY category ORDER BY cnt DESC
+            """).fetchall()
+            analytics_data["categories"] = [
+                {"category": r["category"], "topic_count": r["cnt"], "avg_rating": None}
+                for r in cat_rows
+            ]
+
+            conn.close()
+        except Exception as e:
+            print(f"[/api/stats] DB error: {e}", file=sys.stderr)
+
+    return jsonify({"stats": stats, "suggest": suggest, "analytics": analytics_data})
 
 
 # ── MEMORY ────────────────────────────────────────────────────────────────────
