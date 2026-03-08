@@ -496,6 +496,23 @@ def build_skill_profile():
 
 
 
+# ── PHASE UPDATE API ─────────────────────────────────────────────────────────
+# Called by Antigravity (pipeline executor) after completing each phase step.
+# Example: POST /api/phase/1/research/done
+
+@app.route("/api/phase/<int:eid>/<phase>/<status>", methods=["POST"])
+def set_phase_status(eid, phase, status):
+    """Explicitly set a pipeline phase status. Called by the pipeline executor."""
+    allowed_phases  = set(PHASE_ORDER)
+    allowed_statuses = {"pending", "running", "done", "failed", "skipped"}
+    if phase not in allowed_phases:
+        return jsonify({"error": f"Unknown phase: {phase}"}), 400
+    if status not in allowed_statuses:
+        return jsonify({"error": f"Unknown status: {status}"}), 400
+    mem_raw("pipeline", "set", eid, phase, status)
+    return jsonify({"ok": True, "episode_id": eid, "phase": phase, "status": status})
+
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
 def _get_sources(eid):
@@ -578,16 +595,16 @@ def _auto_detect_phases(eid, ep):
     }
 
     try:
-        # Read-only: get pending phases directly from SQLite
+        # Read-only: get pending AND running phases from SQLite
+        # NOTE: We check 'running' too so stuck-running phases get re-evaluated
         conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
         rows = conn.execute(
-            "SELECT phase FROM pipeline_state WHERE episode_id=? AND status='pending' ORDER BY id",
+            "SELECT phase, status FROM pipeline_state WHERE episode_id=? AND status IN ('pending','running') ORDER BY id",
             (eid,)
         ).fetchall()
         conn.close()
 
-
-        # Auto-init via subprocess if no rows
+        # Auto-init via subprocess if no rows at all
         if not rows:
             total = sqlite3.connect(str(db_path)).execute(
                 "SELECT COUNT(*) FROM pipeline_state WHERE episode_id=?", (eid,)
@@ -596,9 +613,9 @@ def _auto_detect_phases(eid, ep):
                 mem_raw("pipeline", "init", eid)
             return
 
-        # Check which pending phases have files on disk
+        # Check which pending/running phases have completed work on disk
         to_mark_done = []
-        for (phase,) in rows:
+        for (phase, _status) in rows:
             if phase in checks:
                 try:
                     if checks[phase]():

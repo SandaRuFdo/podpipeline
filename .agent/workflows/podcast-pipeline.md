@@ -88,6 +88,9 @@ python .agent/skills/youtube-podcast-researcher/scripts/srt_to_text.py `
 & $MEM source add $EID youtube "<video title>" "https://youtube.com/..."
 & $MEM source add $EID wikipedia "<article title>" "https://en.wikipedia.org/..."
 & $MEM log $EID research "English sources downloaded for script writing"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID research done
 ```
 
 ---
@@ -119,6 +122,9 @@ Save to `$EP/2_script/SCRIPT_EN.md` — section-by-section for user review.
 
 ```powershell
 & $MEM log $EID script "Script written"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID script done
 ```
 
 ---
@@ -173,6 +179,9 @@ notebooklm download audio "$EP/3_audio/podcast.mp3"
 
 & $MEM episode update $EID ep_path $EP
 & $MEM log $EID audio "Podcast generated and downloaded"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID audio done
 ```
 
 ---
@@ -190,6 +199,9 @@ python .agent/skills/audio-listener/scripts/transcribe.py `
 # Update duration in memory
 & $MEM episode update $EID audio_dur <seconds>
 & $MEM log $EID transcribe "Audio transcribed with timestamps"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID transcribe done
 ```
 
 ### 5.1 Map topic transitions
@@ -250,6 +262,9 @@ This ffmpeg scale+pad step is **non-negotiable**. Every image in the pipeline mu
 
 ```powershell
 & $MEM log $EID visuals "N slides generated (PRO prompts) + force_16x9 → 1920x1080"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID visuals done
 ```
 
 
@@ -279,6 +294,9 @@ Audio: 3_audio/podcast.mp3
 & $MEM quality add $EID overall "what worked well" "what to improve" "specific change" <rating>
 & $MEM episode update $EID status complete
 & $MEM log $EID package "Episode complete"
+
+# ✅ Update UI dashboard after phase complete
+python scripts/update_phase.py $EID deliverables done
 ```
 
 ---
