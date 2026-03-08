@@ -15,8 +15,13 @@ import argparse
 import shutil
 import subprocess
 import sys
+import io
 import re
 from pathlib import Path
+
+# Force UTF-8 output so emoji/unicode don't crash on Windows cp1252 terminals
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 BASE = Path(__file__).parent.parent
 MEM  = [sys.executable, str(BASE / ".agent/skills/memory/scripts/memory.py")]
@@ -43,7 +48,7 @@ def ok(text):
 
 
 def warn(text):
-    print(f"  \033[91m⚠ {text}\033[0m")
+    print(f"  \033[91m[!] {text}\033[0m")
 
 
 def main():
@@ -68,12 +73,8 @@ def main():
     step(1, "Checking topic in memory...")
     result = run_mem("topic", "check", args.topic)
     if "COVERED" in result:
-        warn(f"Topic '{args.topic}' was already covered!")
+        warn(f"Topic '{args.topic}' was already covered — continuing anyway (web mode).")
         print(f"  {result[:200]}")
-        confirm = input("  Continue anyway? (y/n): ").strip().lower()
-        if confirm != "y":
-            print("Aborted.")
-            sys.exit(0)
     else:
         ok("Topic is fresh — not covered before.")
 
