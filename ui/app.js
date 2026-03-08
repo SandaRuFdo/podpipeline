@@ -171,7 +171,7 @@ function checkSkillProfile() {
         icon.textContent = "✅";
         const p = data.profile;
         const lbl = (p.lang_label && p.lang_label.length < 30) ? p.lang_label : (p.lang || "?").toUpperCase();
-        msg.textContent = `Writing profile: ${lbl} × ${p.audience_label || "?"} — ${(p.tone || "").slice(0, 40)}…`;
+        msg.textContent = `Writing profile: ${lbl} × ${p.audience_label || "?"} — ${p.tone || ""}`;
         btn.textContent = "Rebuild";
         btn.classList.remove("hidden");
       } else {
