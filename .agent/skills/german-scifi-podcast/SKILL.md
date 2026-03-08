@@ -485,13 +485,13 @@ The #1 factor in output quality is **what you feed NotebookLM:**
 
 | Source Type | Quality Impact | Tip |
 |---|---|---|
-| Well-structured script/brief | ⭐⭐⭐⭐⭐ | Best results — write a detailed episode brief |
-| Cleaned transcript (.txt) | ⭐⭐⭐⭐ | Use `srt_to_text.py` + manual cleanup |
-| Scientific paper | ⭐⭐⭐⭐ | Great for facts, needs pop-culture companion |
-| Raw YouTube auto-subs | ⭐⭐ | Noisy — always clean first |
-| Random URL | ⭐⭐ | Hit or miss — curate carefully |
+| Well-structured script/brief | ⭐⭐⭐⭐⭐ | **THE source for audio gen** — feed ONLY this |
+| Cleaned transcript (.txt) | ⭐⭐⭐⭐ | Great for RESEARCH — do NOT add to audio notebook |
+| Scientific paper | ⭐⭐⭐⭐ | Use for script writing, not for audio |
+| Raw YouTube auto-subs | ⭐⭐ | Research fuel only — clean with `srt_to_text.py` |
+| Random URL | ⭐⭐ | Research only |
 
-**Golden Rule:** Feed it a detailed script/brief as source = the AI follows your vision.
+**Golden Rule:** The script is the SINGLE source for audio generation. English research sources go into your brain, not into NotebookLM.
 
 ### Mega-Prompt Template for Best Audio
 
@@ -622,10 +622,10 @@ Before finalizing ANY episode, check ALL of these:
 
 ### Technical
 - [ ] NotebookLM language set to `de`
-- [ ] At least 1 German source added
+- [ ] **Script is the ONLY source** in the audio notebook (no English sources!)
 - [ ] Detailed prompt includes structure + emotion + style
 - [ ] `--retry 3` used on all generate commands
-- [ ] Episode brief/script uploaded as primary source
+- [ ] English research sources kept in `1_research/sources/` only
 
 ### Engagement
 - [ ] Hook in first 30 seconds
@@ -658,10 +658,11 @@ Before finalizing ANY episode, check ALL of these:
    → Add extra research for depth
    → Create detailed mega-prompt
 
-5. GENERATE
-   → Feed script + sources to NotebookLM
+4. GENERATE
+   → Create FRESH notebook with ONLY the script as source
    → Generate audio with mega-prompt
    → Listen → Iterate (2-3 rounds)
+   → English sources stay in 1_research/ — never in the audio notebook
 
 6. PRODUCE
    → Generate supporting content (video, quiz, etc.)

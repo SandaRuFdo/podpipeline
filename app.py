@@ -220,6 +220,7 @@ def get_episode(eid):
     ep = mem("episode", "get", eid)
     if not isinstance(ep, dict):
         return jsonify({"error": "not found"}), 404
+    _auto_detect_phases(eid, ep)  # auto-mark phases based on filesystem
     pipeline_raw = mem_raw("pipeline", "status", eid)
     phases   = _parse_pipeline(pipeline_raw)
     sources  = _get_sources(eid)
@@ -315,6 +316,7 @@ def export_episode(eid):
     ep = mem("episode", "get", eid)
     if not isinstance(ep, dict):
         return jsonify({"error": "not found"}), 404
+    _auto_detect_phases(eid, ep)
     phases = _parse_pipeline(mem_raw("pipeline", "status", eid))
     sources = _get_sources(eid)
     ctx = mem_raw("context", eid)
@@ -436,6 +438,57 @@ def _get_sources(eid):
         conn.close()
         return [dict(r) for r in rows]
     except: return []
+
+
+def _auto_detect_phases(eid, ep):
+    """Check filesystem for completed work and auto-mark phases via direct SQLite."""
+    import sqlite3
+    ep_path = ep.get("ep_path", "")
+    if not ep_path:
+        return
+    p = Path(ep_path)
+    if not p.exists():
+        return
+
+    db_path = BASE / ".agent/skills/memory/podcast_memory.db"
+    if not db_path.exists():
+        return
+
+    # What files prove each phase is done
+    checks = {
+        "setup":       lambda: (p / "README.md").exists(),
+        "research":    lambda: any((p / "1_research" / "sources").glob("*.*")) if (p / "1_research" / "sources").exists() else False,
+        "script":      lambda: (p / "2_script" / "SCRIPT_DE.md").exists() and (p / "2_script" / "SCRIPT_DE.md").stat().st_size > 100,
+        "audio":       lambda: (p / "3_audio" / "podcast.mp3").exists(),
+        "transcribe":  lambda: (p / "3_audio" / "transcript.txt").exists(),
+        "visuals":     lambda: any((p / "4_visuals").glob("slide*.*")) if (p / "4_visuals").exists() else False,
+        "deliverables": lambda: (p / "5_deliverables" / "walkthrough.md").exists() if (p / "5_deliverables").exists() else False,
+    }
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        # Get all pending phases in one query
+        rows = conn.execute(
+            "SELECT phase, status FROM pipeline_state WHERE episode_id=? AND status='pending'",
+            (eid,)
+        ).fetchall()
+        pending = {r[0] for r in rows}
+
+        # Auto-mark phases that have files on disk
+        for phase in pending:
+            if phase in checks:
+                try:
+                    if checks[phase]():
+                        conn.execute(
+                            "UPDATE pipeline_state SET status='done', done_at=datetime('now') WHERE episode_id=? AND phase=?",
+                            (eid, phase)
+                        )
+                except Exception:
+                    pass
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 
 def _parse_pipeline(raw_text):

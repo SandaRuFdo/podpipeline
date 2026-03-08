@@ -51,7 +51,10 @@ MEM = "python .agent/skills/memory/scripts/memory.py"
 
 ---
 
-## PHASE 2 — Research (Real Sources Only, No Imagination)
+## PHASE 2 — Research (English Sources for Understanding Only)
+
+> ⚠️ English sources are **research fuel only** — they do NOT go into the audio notebook.
+> The German script is the **single source** for audio generation (Phase 4).
 
 ### 2.1 Find viral English content on the topic
 
@@ -73,49 +76,20 @@ python .agent/skills/youtube-podcast-researcher/scripts/srt_to_text.py `
   "$EP/1_research/sources/<title>.en.srt"
 ```
 
-### 2.2 Create NotebookLM notebook
+### 2.2 Log sources in memory
 
 ```powershell
-$env:PYTHONIOENCODING="utf-8"
-
-notebooklm create "S{0:D2}E{1:D2} - <Topic Title>" --json
-# → Save notebook ID e.g. abc123...
-notebooklm use <notebook_id>
-
-# Update memory with notebook ID
-& $MEM episode update $EID notebook_id <notebook_id>
-```
-
-### 2.3 Add Sources
-
-```powershell
-# Add YouTube URL directly (NotebookLM auto-extracts transcript)
-notebooklm source add "https://youtube.com/watch?v=VIDEO_ID" --json
-
-# Add cleaned transcript text
-notebooklm source add "$EP/1_research/sources/<title>.txt" --json
-
-# Add English Wikipedia
-notebooklm source add "https://en.wikipedia.org/wiki/<Topic>" --json
-
-# Add German Wikipedia (improves German output quality!)
-notebooklm source add "https://de.wikipedia.org/wiki/<Thema>" --json
-
-# Deep web research (finds more sources automatically — runs async)
-notebooklm source add-research "<topic> latest research evidence controversy" --mode deep --no-wait
-
-# Wait for all sources to be ready
-notebooklm source list --json   # Check all "status": "ready"
-
-# Log in memory
 & $MEM source add $EID youtube "<video title>" "https://youtube.com/..."
-& $MEM source add $EID wikipedia "<article title>" "https://de.wikipedia.org/..."
-& $MEM log $EID research "Sources added to NotebookLM"
+& $MEM source add $EID wikipedia "<article title>" "https://en.wikipedia.org/..."
+& $MEM log $EID research "English sources downloaded for script writing"
 ```
 
 ---
 
 ## PHASE 3 — Script Writing (German, Gen Z, Nova + Max)
+
+> Read the English sources from `$EP/1_research/sources/` to deeply understand the topic.
+> Then write an amazing German script — this is where the magic happens.
 
 ### 3.1 Load memory context for consistency
 
@@ -131,28 +105,49 @@ Use **German SciFi Podcast Director** skill. Save to `$EP/2_script/SCRIPT_DE.md`
 - **Tone:** Nova (storyteller) + Max (reactor) — casual German, Gen Z analogies
 - **Length:** 15–25 minutes of dialogue
 - **No „Willkommen bei..."** — start mid-action
+- **Use English sources as reference** — adapt, don't translate
 
-### 3.3 Add script as primary source (highest quality impact)
-
-```powershell
-notebooklm source add "$EP/2_script/SCRIPT_DE.md" --json
-```
-
-### 3.4 Write English translation
+### 3.3 Write English translation
 
 Save to `$EP/2_script/SCRIPT_EN.md` — section-by-section for user review.
 
 ```powershell
-& $MEM log $EID script "Script written and added as source"
+& $MEM log $EID script "Script written"
 ```
 
 ---
 
-## PHASE 4 — Generate Podcast (NotebookLM)
+## PHASE 4 — Generate Podcast (Script-Only Notebook)
+
+> 🎯 **KEY RULE:** The script is the ONLY source for audio generation.
+> Do NOT add English research sources to this notebook.
+
+### 4.1 Create a fresh notebook for audio generation
 
 ```powershell
 $env:PYTHONIOENCODING="utf-8"
 
+notebooklm create "S{0:D2}E{1:D2} - <Topic Title>" --json
+# → Save notebook ID
+notebooklm use <notebook_id>
+
+# Update memory with notebook ID
+& $MEM episode update $EID notebook_id <notebook_id>
+```
+
+### 4.2 Add ONLY the German script as source
+
+```powershell
+# This is the ONLY source — no English transcripts, no Wikipedia
+notebooklm source add "$EP/2_script/SCRIPT_DE.md" --json
+
+# Wait for source to be ready
+notebooklm source list --json   # Check "status": "ready"
+```
+
+### 4.3 Generate audio
+
+```powershell
 # Set German language
 notebooklm language set de
 

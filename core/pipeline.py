@@ -46,9 +46,9 @@ PHASE_ICONS = {
 
 PHASE_DESC = {
     "setup":           "Create episode folder + register in memory",
-    "research":        "Find YouTube sources, add to NotebookLM",
-    "script":          "Write German script (Nova + Max) + English translation",
-    "audio":           "Generate podcast via NotebookLM, download MP3",
+    "research":        "Find English sources (YouTube, Wikipedia) for understanding",
+    "script":          "Write German script (Nova + Max) from English sources + English translation",
+    "audio":           "Script-only notebook → generate podcast via NotebookLM → download MP3",
     "transcribe":      "Transcribe audio with real timestamps",
     "visuals":         "Generate 16:9 cinematic images for each segment",
     "deliverables":    "Build CapCut walkthrough + register topic/quality in memory",
