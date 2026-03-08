@@ -227,6 +227,10 @@ def get_episode(eid):
     sources  = _get_sources(eid)
     ctx      = mem_raw("context", eid)
     audience = mem("audience", "get", ep.get("target_audience", "scifi_curious"))
+    if not isinstance(audience, dict):
+        audience = {"key": ep.get("target_audience",""), "label": ep.get("target_audience","Unknown"),
+                    "emoji": "🎧", "age_range": "N/A", "cpm_low": 0, "cpm_high": 0,
+                    "description": "", "content_tips": "", "best_niches": "", "platforms": ""}
     return jsonify({"episode": ep, "phases": phases, "sources": sources,
                     "context_preview": ctx[:800], "audience": audience})
 
