@@ -217,16 +217,19 @@ def _ep_by_se(season, episode):
 
 @app.route("/api/episodes/<int:eid>")
 def get_episode(eid):
+    import time
     ep = mem("episode", "get", eid)
     if not isinstance(ep, dict):
         return jsonify({"error": "not found"}), 404
-    _auto_detect_phases(eid, ep)  # auto-mark phases via direct SQLite
+    _auto_detect_phases(eid, ep)  # fires subprocess writes
+    time.sleep(0.3)               # wait for WAL to checkpoint subprocess commits
     phases   = _get_phases_direct(eid)  # read back from SQLite directly
     sources  = _get_sources(eid)
     ctx      = mem_raw("context", eid)
     audience = mem("audience", "get", ep.get("target_audience", "scifi_curious"))
     return jsonify({"episode": ep, "phases": phases, "sources": sources,
                     "context_preview": ctx[:800], "audience": audience})
+
 
 
 @app.route("/api/episodes", methods=["POST"])
@@ -440,13 +443,17 @@ def _get_sources(eid):
 
 
 def _get_phases_direct(eid):
-    """Read pipeline phases directly from SQLite — no subprocess."""
+    """Read pipeline phases directly from SQLite — no subprocess.
+    Issues WAL checkpoint first to ensure subprocess-written data is visible.
+    """
     import sqlite3
     db_path = BASE / ".agent/skills/memory/podcast_memory.db"
     if not db_path.exists():
         return [{"phase": p, "status": "pending"} for p in PHASE_ORDER]
     try:
-        conn = sqlite3.connect(str(db_path)); conn.row_factory = sqlite3.Row
+        conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")  # flush WAL so we see subprocess writes
+        conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id", (eid,)
         ).fetchall()
@@ -459,8 +466,12 @@ def _get_phases_direct(eid):
         return [{"phase": p, "status": "pending"} for p in PHASE_ORDER]
 
 
+
 def _auto_detect_phases(eid, ep):
-    """Check filesystem for completed work and auto-mark phases via direct SQLite."""
+    """Check filesystem for completed work.
+    Reads via direct SQLite (read-only, no lock conflict).
+    Writes via mem_raw subprocess (separate process, zero WAL conflict).
+    """
     import sqlite3
     ep_path = ep.get("ep_path", "")
     if not ep_path:
@@ -473,55 +484,91 @@ def _auto_detect_phases(eid, ep):
     if not db_path.exists():
         return
 
-    # What files prove each phase is done
+    # File checks for each phase
+    def _src_exist():
+        d = p / "1_research" / "sources"
+        return d.exists() and any(d.glob("*.*"))
+    def _vis_exist():
+        d = p / "4_visuals"
+        return d.exists() and any(d.glob("slide*.*"))
+    def _del_exist():
+        d = p / "5_deliverables"
+        return d.exists() and (d / "walkthrough.md").exists()
+    def _script_exist():
+        s = p / "2_script" / "SCRIPT_DE.md"
+        return s.exists() and s.stat().st_size > 100
+
     checks = {
-        "setup":       lambda: (p / "README.md").exists(),
-        "research":    lambda: any((p / "1_research" / "sources").glob("*.*")) if (p / "1_research" / "sources").exists() else False,
-        "script":      lambda: (p / "2_script" / "SCRIPT_DE.md").exists() and (p / "2_script" / "SCRIPT_DE.md").stat().st_size > 100,
-        "audio":       lambda: (p / "3_audio" / "podcast.mp3").exists(),
-        "transcribe":  lambda: (p / "3_audio" / "transcript.txt").exists(),
-        "visuals":     lambda: any((p / "4_visuals").glob("slide*.*")) if (p / "4_visuals").exists() else False,
-        "deliverables": lambda: (p / "5_deliverables" / "walkthrough.md").exists() if (p / "5_deliverables").exists() else False,
+        "setup":        lambda: (p / "README.md").exists(),
+        "research":     _src_exist,
+        "script":       _script_exist,
+        "audio":        lambda: (p / "3_audio" / "podcast.mp3").exists(),
+        "transcribe":   lambda: (p / "3_audio" / "transcript.txt").exists(),
+        "visuals":      _vis_exist,
+        "deliverables": _del_exist,
     }
 
     try:
-        conn = sqlite3.connect(str(db_path))
-
-        # Auto-init pipeline rows if they don't exist yet
-        existing = conn.execute(
-            "SELECT COUNT(*) FROM pipeline_state WHERE episode_id=?", (eid,)
-        ).fetchone()[0]
-        if existing == 0:
-            phases_list = ["setup","research","script","audio","transcribe","visuals","deliverables","cinematic_setup"]
-            for ph in phases_list:
-                conn.execute(
-                    "INSERT OR IGNORE INTO pipeline_state(episode_id, phase, status) VALUES(?,?,'pending')",
-                    (eid, ph)
-                )
-            conn.commit()
-
-        # Get all pending phases in one query
+        # Read-only: get pending phases directly from SQLite
+        conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
         rows = conn.execute(
-            "SELECT phase, status FROM pipeline_state WHERE episode_id=? AND status='pending'",
+            "SELECT phase FROM pipeline_state WHERE episode_id=? AND status='pending' ORDER BY id",
             (eid,)
         ).fetchall()
-        pending = {r[0] for r in rows}
+        conn.close()
+        print(f"[trace] eid={eid} pending_rows={[r[0] for r in rows]}", file=sys.stderr)
 
-        # Auto-mark phases that have files on disk
-        for phase in pending:
+        # Auto-init via subprocess if no rows
+        if not rows:
+            total = sqlite3.connect(str(db_path)).execute(
+                "SELECT COUNT(*) FROM pipeline_state WHERE episode_id=?", (eid,)
+            ).fetchone()[0]
+            if total == 0:
+                mem_raw("pipeline", "init", eid)
+            return
+
+        # Check which pending phases have files on disk
+        to_mark_done = []
+        for (phase,) in rows:
             if phase in checks:
                 try:
                     if checks[phase]():
-                        conn.execute(
-                            "UPDATE pipeline_state SET status='done', done_at=datetime('now') WHERE episode_id=? AND phase=?",
-                            (eid, phase)
-                        )
+                        to_mark_done.append(phase)
                 except Exception:
                     pass
-        conn.commit()
-        conn.close()
-    except Exception:
-        pass
+
+        print(f"[trace] to_mark_done={to_mark_done}", file=sys.stderr)
+        # Write via subprocess — separate process avoids WAL conflict
+        for phase in to_mark_done:
+            r = mem_raw("pipeline", "set", eid, phase, "done")
+            print(f"[trace] set {phase} done: {r[:50]}", file=sys.stderr)
+
+        # Auto-progress: always ensure first pending phase is marked 'running'
+        # Re-read state after subprocess writes (mem_raw is synchronous)
+        import time; time.sleep(0.1)  # tiny delay to let WAL checkpoint
+        conn3 = sqlite3.connect(str(db_path), check_same_thread=False, timeout=3)
+        all_rows = conn3.execute(
+            "SELECT phase, status FROM pipeline_state WHERE episode_id=? ORDER BY id",
+            (eid,)
+        ).fetchall()
+        conn3.close()
+
+        phase_status = {r[0]: r[1] for r in all_rows}
+        any_done = any(s == "done" for s in phase_status.values())
+        if any_done:
+            next_phase = next(
+                (ph for ph in PHASE_ORDER if phase_status.get(ph) == "pending"),
+                None
+            )
+            if next_phase:
+                print(f"[trace] marking next_phase={next_phase} as running", file=sys.stderr)
+                r2 = mem_raw("pipeline", "set", eid, next_phase, "running")
+                print(f"[trace] running result: {r2[:80]}", file=sys.stderr)
+
+
+
+    except Exception as e:
+        print(f"[auto-detect] ERROR eid={eid}: {type(e).__name__}: {e}", file=sys.stderr)
 
 
 def _parse_pipeline(raw_text):

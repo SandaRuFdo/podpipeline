@@ -735,7 +735,7 @@ def pipeline_set(eid, phase, status, error=None):
             ON CONFLICT(episode_id, phase) DO UPDATE SET
                 status='running', started_at=datetime('now'),
                 attempts=pipeline_state.attempts+1, error=NULL
-        """, (eid, phase))
+        """, (eid, phase, "running"))
     elif status in ("done", "failed", "skipped"):
         db.execute("""
             UPDATE pipeline_state SET status=?, done_at=datetime('now'), error=?
