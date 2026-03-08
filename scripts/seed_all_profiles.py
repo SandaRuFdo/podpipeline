@@ -86,7 +86,7 @@ PROFILES = {
 
     ("de", "finance_listeners"): {
         "lang_label": "German", "audience_label": "Finance Listeners",
-        "tone": "Seriös aber nahbar. Wie ein smarter Finanzberater der auch Science-Fiction-Fan ist. Datengetrieben, präzise, aber mit Leidenschaft. Deutsche Gründlichkeit meets Wall-Street-Energy.",
+        "tone": "Serious but approachable. Like a smart financial advisor who's also a sci-fi fan. Data-driven, precise, but passionate. German thoroughness meets Wall Street energy.",
         "slang": "Rendite, Depot, Sparquote, Moonshot, Bullenmarkt, Bärenmarkt, Cashflow, Hebel, ETF-Sparplan, All-In, Disruption, Gamechanger, FOMO, Kursrakete",
         "vocab": "Wissenschaft durch Investmentbrille. Marktpotenziale beziffern. Nutze: TAM, S-Kurve, Disruptionstheorie. Quantencomputing erklärt als Marktchance. Physik als Anlagetrend.",
         "cultural_refs": "Finanzfluss, Aktien mit Kopf, Der Aktionär, Handelsblatt, WirtschaftsWoche, Frank Thelen, Elon Musk, DAX, Siemens Forschung, SAP Innovation, BioNTech-Story",
@@ -95,7 +95,7 @@ PROFILES = {
     },
     ("de", "millennials"): {
         "lang_label": "German", "audience_label": "Millennials",
-        "tone": "Nachdenklich, intelligent, mit Nostalgie-Touch. Wie ein Gespräch unter gebildeten Freunden beim Craft Beer. Tiefgang willkommen. Balance zwischen Optimismus und Realismus. Philosophisch aber zugänglich.",
+        "tone": "Thoughtful, intelligent, with a nostalgia touch. Like a conversation among educated friends over craft beer. Depth welcome. Balance between optimism and realism. Philosophical but accessible.",
         "slang": "Erwachsen werden ist überbewertet, voll mein Ding, passt schon, läuft bei dir, Struggle ist real, Bock drauf, deep, wholesome, relatable, Overthinking-Modus",
         "vocab": "Zugängliche Wissenschaft mit Kontext. Philosophie trifft Physik. Metaphern aus dem Alltag — Miete, Karriere, existenzielle Krisen. Komplexe Themen durch Lebenserfahrung erklären.",
         "cultural_refs": "Stromberg, Dark (Netflix), Rammstein, Tatort, Die Sendung mit der Maus (nostalgisch), Jan Böhmermann, Kurzgesagt, Terra X, Matrix-Trilogie, Interstellar, 90er Kindheit",
@@ -104,7 +104,7 @@ PROFILES = {
     },
     ("de", "tech_enthusiasts"): {
         "lang_label": "German", "audience_label": "Tech Enthusiasts",
-        "tone": "Präzise, technisch fundiert, neugierig. Wie ein Senior Developer der Cutting-Edge-Research erklärt. First-Principles-Denken. Respektiere ihre Intelligenz. Tieftauchen in Mechaniken.",
+        "tone": "Precise, technically grounded, curious. Like a senior developer explaining cutting-edge research. First-principles thinking. Respect their intelligence. Deep-dive into mechanics.",
         "slang": "Deployen, shippen, Edge-Case, technische Schuld, Spaghetti-Code, läuft auf meiner Maschine, Rubber-Ducking, Nerd-Sniping, Overengineered, Stack, Dependency Hell",
         "vocab": "Echte technische Terminologie — einmal erklären, dann verwenden. Referenziere Papers (arXiv). Nutze: Big-O-Metaphern, API-Analogien, System-Design-Denken. Naturphänomene als verteilte Systeme.",
         "cultural_refs": "Heise, Golem.de, c't Magazin, CCC (Chaos Computer Club), re:publica, Linus Torvalds, Two Minute Papers, 3Blue1Brown, GitHub Trending, Hacker News, r/de_EDV",
@@ -113,7 +113,7 @@ PROFILES = {
     },
     ("de", "gen_z"): {
         "lang_label": "German", "audience_label": "Gen Z",
-        "tone": "Ultra-locker, schnell, wie zwei beste Freunde die auf Discord über Science nerden um 2 Uhr nachts. Kurze punchige Bursts. Aufregung über Präzision. Gaming-Metaphern. Meme-literat.",
+        "tone": "Ultra-casual, fast, like two best friends nerding out about science on Discord at 2 AM. Short punchy bursts. Excitement over precision. Gaming metaphors. Meme-literate.",
         "slang": "Krass, Digga, Wallah, sheesh, uff, sus, cringe, safe, Ehrenmann, lost, Bock, vibe, lit, flex, Alter, no front, real talk, Bre, wild, random, Ehrenfrau",
         "vocab": "Alles durch Gaming-, Anime- oder Social-Media-Metaphern erklären. 'Schwarze Löcher sind der Endboss der Physik.' Sätze unter 15 Wörtern. Fragmentsätze OK. CAPS für Emphasis.",
         "cultural_refs": "Minecraft, One Piece, Attack on Titan, Gronkh, Rezo, HandOfBlood, Julien Bam, HeyMoritz, TikTok-Deutschland, Twitch-DE, Jujutsu Kaisen, Demon Slayer, GermanLetsPlay",
@@ -122,7 +122,7 @@ PROFILES = {
     },
     ("de", "health_wellness"): {
         "lang_label": "German", "audience_label": "Health & Wellness",
-        "tone": "Warm, empathisch, wissenschaftlich fundiert aber emotional. Wie ein mitfühlender Arzt-Freund der Cutting-Edge-Forschung liest. Persönliche Stakes — 'das betrifft DEINEN Körper.' Inspirierend ohne zu predigen.",
+        "tone": "Warm, empathetic, scientifically grounded but emotional. Like a compassionate doctor friend who reads cutting-edge research. Personal stakes — 'this affects YOUR body.' Inspiring without preaching.",
         "slang": "Biohacking, Langlebigkeit, Optimieren, Darm-Hirn-Achse, zirkadiane Rhythmen, Stoffwechsel, Eisbaden, Erdung, Nervensystem-Regulation, Achtsamkeit, Selbstheilung",
         "vocab": "Medizinische Begriffe mit sofortiger Alltagserklärung. Weltraum/Physik mit Humanbiologie verbinden. Nutze: Telomere, Mitochondrien, Neuroplastizität, Mikrobiom — immer erklären was es für IHRE Gesundheit bedeutet.",
         "cultural_refs": "Dr. Eckart von Hirschhausen, Quarks, Geo Wissen, Charité, MaxPlanck, Huberman Lab (DE-Fans), Tim Ferriss, ARD Gesundheit, Apotheken Umschau (modern), Biohacking-Szene Berlin",
@@ -131,7 +131,7 @@ PROFILES = {
     },
     ("de", "scifi_curious"): {
         "lang_label": "German", "audience_label": "Sci-Fi Curious",
-        "tone": "Staunend, Story-First, zugänglich. Wie ein cooler Wissenschaftslehrer bei dem du vergisst dass du lernst. Gleiche Teile Unterhaltung und Bildung. Ehrfurcht aufbauen. 'Holy Shit'-Momente kreieren.",
+        "tone": "Wonder-filled, story-first, accessible. Like a cool science teacher who makes you forget you're learning. Equal parts entertainment and education. Build awe. Create 'holy shit' moments.",
         "slang": "Mind-Blow, Plot Twist, Lore Drop, Multiversum, Simulation confirmed, Zeitreise-Vibes, Galaxy Brain, Reality Check, kosmischer Horror, Easter Egg, Worldbuilding, Canon",
         "vocab": "Wissenschaft cineastisch machen. Jedes Konzept kriegt eine Film-Beschreibung. Lebendige Metaphern: 'Stell dir vor, das gesamte Universum passt in einen Teelöffel.' Balance echte Science mit spekulativem 'Was wäre wenn'.",
         "cultural_refs": "Dark (Netflix), Interstellar, Dune, The Expanse, Kurzgesagt, Terra X, Perry Rhodan, Drei Körper Problem, Black Mirror, Harald Lesch, Raumzeit Podcast, Star Trek (DE Synchron)",
@@ -145,7 +145,7 @@ PROFILES = {
 
     ("fr", "finance_listeners"): {
         "lang_label": "French", "audience_label": "Finance Listeners",
-        "tone": "Élégant mais percutant. Comme un analyste de Goldman Sachs passionné de science-fiction. Rigoureux avec les chiffres. Confiance intellectuelle. 'L'argent intelligent' se positionne déjà.",
+        "tone": "Elegant but hard-hitting. Like a Goldman Sachs analyst passionate about sci-fi. Rigorous with numbers. Intellectual confidence. 'Smart money is already positioning.'",
         "slang": "Rendement, portefeuille, valorisation, disruption, scalable, game-changer, bull run, bear market, hedge, effet de levier, liquidité, allocation, private equity, levée de fonds",
         "vocab": "Termes scientifiques liés à l'impact marché. Cadrer les découvertes comme des tendances investissables. Utiliser: TAM, courbe S, deeptech, économie de l'attention. Quantique/IA comme thèse d'investissement.",
         "cultural_refs": "Les Échos, BFM Business, LVMH Innovation, Station F, Xavier Niel, BpiFrance, Dassault Systèmes, Ariane Group, CMA CGM tech ventures, Matthieu Pigasse",
@@ -154,7 +154,7 @@ PROFILES = {
     },
     ("fr", "millennials"): {
         "lang_label": "French", "audience_label": "Millennials",
-        "tone": "Intellectuel mais accessible. Comme un podcast France Culture version pop. Réflexion profonde avec légèreté. Le plaisir de comprendre. Nostalgie assumée des années 90/2000. Philosophie au quotidien.",
+        "tone": "Intellectual but accessible. Like a France Culture podcast gone pop. Deep reflection with lightness. The pleasure of understanding. Unapologetic 90s/2000s nostalgia. Everyday philosophy.",
         "slang": "C'est chaud, ça passe, tranquille, grave, trop bien, en mode, banger, galère, mytho, la flemme, cramé, c'est relou, j'avoue, en vrai, stylé, validé",
         "vocab": "Science accessible avec références culturelles françaises. Philosophie et physique main dans la main. Métaphores du quotidien parisien — métro, boulot, existentialisme appliqué.",
         "cultural_refs": "Kaamelott, OSS 117, Matrix, Interstellar, Étienne Klein, Hubert Reeves, Astérix (ironique), Les Inconnus, Daft Punk, les années Canal+, Dark (Netflix), Fondation (Asimov)",
@@ -163,7 +163,7 @@ PROFILES = {
     },
     ("fr", "tech_enthusiasts"): {
         "lang_label": "French", "audience_label": "Tech Enthusiasts",
-        "tone": "Précis, rigoureux, passionné. Comme un ingénieur INRIA qui explique une percée. First-principles. Respecter l'intelligence de l'auditeur. Deep-dive bienvenu. L'élégance de la logique.",
+        "tone": "Precise, rigorous, passionate. Like an INRIA engineer explaining a breakthrough. First-principles. Respect the listener's intelligence. Deep-dive welcome. The elegance of logic.",
         "slang": "Ça compile, shipper, déployer, edge case, dette technique, code spaghetti, ça marche sur ma machine, stack overflow, overengineered, feature creep, merge conflict, pull request",
         "vocab": "Terminologie technique réelle — expliquer une fois, puis utiliser librement. Référencer des papers. Big-O, API comme métaphore, architecture système. Phénomènes naturels comme systèmes distribués.",
         "cultural_refs": "Le Journal du Hacker, Next INpact, INRIA, CNRS, Polytechnique, OVHcloud, Mistral AI, LeBonCoin tech blog, Alan, Doctolib engineering, Paris AI meetups, 42 School",
@@ -172,7 +172,7 @@ PROFILES = {
     },
     ("fr", "gen_z"): {
         "lang_label": "French", "audience_label": "Gen Z",
-        "tone": "Ultra-rapide, authentique, chaotique mais brillant. Comme deux potes qui crient sur un Discord à 2h du mat'. Énergie maximale. Mème-literate. Auto-dérision. Casser le quatrième mur.",
+        "tone": "Ultra-fast, authentic, chaotic but brilliant. Like two friends screaming on Discord at 2 AM. Maximum energy. Meme-literate. Self-deprecating humor. Break the fourth wall.",
         "slang": "Frère, c'est chaud, wallah, j'avoue, chanmé, la hess, dead, clivant, cringe, seum, daron/daronne, bail, ça claque, en vrai, pookie, slay, ratio, mid, goat",
         "vocab": "Tout expliquer via gaming, anime ou réseaux sociaux. 'Les trous noirs c'est le boss final de la physique.' Phrases courtes. Fragments OK. MAJUSCULES pour emphasis. Energie TikTok.",
         "cultural_refs": "Squeezie, Cyprien, Inoxtag, Minecraft, One Piece, Naruto, Jujutsu Kaisen, TikTok France, Twitch FR, Gotaga, Kameto, Kylian Mbappé, Zone Interdite (mèmes), Netflix FR",
@@ -181,7 +181,7 @@ PROFILES = {
     },
     ("fr", "health_wellness"): {
         "lang_label": "French", "audience_label": "Health & Wellness",
-        "tone": "Chaleureux, empathique, ancré dans la science. Comme un médecin ami qui lit les dernières publications. Enjeux personnels — 'ça concerne VOTRE corps.' Inspirant sans être moralisateur. Art de vivre.",
+        "tone": "Warm, empathetic, anchored in science. Like a doctor friend who reads the latest publications. Personal stakes — 'this concerns YOUR body.' Inspiring without moralizing. Art of living.",
         "slang": "Bien-être, pleine conscience, détox, microbiote, chronobiologie, jeûne intermittent, cohérence cardiaque, naturopathie, médecine fonctionnelle, longivité, anti-âge",
         "vocab": "Termes médicaux avec explication immédiate en langage courant. Connecter espace/physique à la biologie humaine. Telomères, mitochondries, neuroplasticité — toujours ce que ça signifie pour LEUR santé.",
         "cultural_refs": "Michel Cymes, France 5 Santé, Doctissimo (modernisé), Institut Pasteur, INSERM, Thierry Casasnovas (controversé mais connu), FitnessPark, Yuka app, Goop trad FR",
@@ -190,7 +190,7 @@ PROFILES = {
     },
     ("fr", "scifi_curious"): {
         "lang_label": "French", "audience_label": "Sci-Fi Curious",
-        "tone": "Émerveillement, narration d'abord, accessible. Comme un prof de sciences cool qui fait oublier qu'on apprend. Divertissement et éducation à parts égales. Construire l'émerveillement. Moments 'putain c'est ouf'.",
+        "tone": "Wonder-filled, narrative-first, accessible. Like a cool science teacher who makes you forget you're learning. Entertainment and education in equal parts. Build wonder. Create 'holy shit' moments.",
         "slang": "Mind-blow, plot twist, lore drop, multivers, simulation confirmée, vibes voyage temporel, galaxy brain, reality check, horreur cosmique, monde ouvert, worldbuilding, Easter egg",
         "vocab": "Science rendue cinématique. Chaque concept reçoit une description digne d'un film. Métaphores vivantes: 'Imagine l'univers entier dans une cuillère à café.' Balance science réelle et scénarios 'et si'.",
         "cultural_refs": "Dark (Netflix), Interstellar, Dune, La Planète des singes, Valérian, Jules Verne, Le Petit Prince (métaphore), Métal Hurlant, Besson (Le Cinquième Élément), Fondation, Étienne Klein",
@@ -204,7 +204,7 @@ PROFILES = {
 
     ("pt", "finance_listeners"): {
         "lang_label": "Portuguese", "audience_label": "Finance Listeners",
-        "tone": "Autoritário mas apaixonado. Como um analista afiado que se empolga com oportunidades de mercado. Dados concretos. Energia de podcast brasileiro premium. Confiança sem arrogância.",
+        "tone": "Authoritative but passionate. Like a sharp analyst who gets excited about market opportunities. Concrete data. Premium Brazilian podcast energy. Confidence without arrogance.",
         "slang": "Cara, firmeza, top demais, pesado, jogada, virada de jogo, rendimento, carteira, aporte, renda passiva, valuation, tese de investimento, upside, compound interest",
         "vocab": "Ciência conectada a impacto de mercado. Descobertas como tendências investíveis. Use: TAM, curva S, disrupção, unit economics. Explique quântica/IA através do ROI.",
         "cultural_refs": "Primo Rico, Nath Finanças, InfoMoney, B3, Nubank, Shark Tank Brasil, Elon Musk, real vs dólar, Itaú Labs, Embraer, Stone, PagSeguro, Warren Buffett",
@@ -213,7 +213,7 @@ PROFILES = {
     },
     ("pt", "millennials"): {
         "lang_label": "Portuguese", "audience_label": "Millennials",
-        "tone": "Reflexivo, inteligente, com toque nostálgico. Como explicar ciência fascinante pra amigos espertos no bar. Otimismo equilibrado. Profundidade bem-vinda. Filosofia no cotidiano brasileiro.",
+        "tone": "Reflective, intelligent, with a nostalgic touch. Like explaining fascinating science to smart friends at a bar. Balanced optimism. Depth welcome. Philosophy in Brazilian daily life.",
         "slang": "Mano, é isso, faz sentido, real oficial, tá ligado, zueira never ends, surreal, pique, mood, tipo, rolê, perrengue, correria, vibe",
         "vocab": "Ciência acessível com contexto brasileiro. Filosofia e física juntas. Metáforas do dia a dia — boleto, carreira, crise existencial. Temas complexos através da experiência vivida.",
         "cultural_refs": "Porta dos Fundos, 3%, Black Mirror, Matrix, Chaves (nostalgia), Mamonas Assassinas, Sandy e Junior, Harry Potter, Interstellar, Jovem Nerd, Nerdologia, Atila Iamarino",
@@ -222,7 +222,7 @@ PROFILES = {
     },
     ("pt", "tech_enthusiasts"): {
         "lang_label": "Portuguese", "audience_label": "Tech Enthusiasts",
-        "tone": "Preciso, rigoroso, profundamente curioso. Como um senior dev explicando pesquisa cutting-edge. First-principles. Respeite a inteligência deles. Deep-dive nos mecanismos. Clareza técnica.",
+        "tone": "Precise, rigorous, deeply curious. Like a senior dev explaining cutting-edge research. First-principles. Respect their intelligence. Deep-dive into mechanisms. Technical clarity.",
         "slang": "Deploy, shipar, edge case, dívida técnica, código espaguete, funciona na minha máquina, rubber ducking, gambiarra (com orgulho), stack, overengineered, POC, MVP, sprint",
         "vocab": "Terminologia técnica real — explique uma vez, depois use. Referencie papers. Big-O como metáfora, analogias de API, pensamento de system design. Fenômenos naturais como sistemas distribuídos.",
         "cultural_refs": "TabNews, Filipe Deschamps, Código Fonte TV, Fabio Akita, Alura, RockContent, Nubank engineering blog, iFood tech, PagSeguro dev, GitHub Brasil, Hacker News",
@@ -231,7 +231,7 @@ PROFILES = {
     },
     ("pt", "gen_z"): {
         "lang_label": "Portuguese", "audience_label": "Gen Z",
-        "tone": "Rápido, caótico, autêntico. Como dois amigos gritando sobre ciência num Discord às 2 da manhã. Energia máxima. Alfabetizado em memes. Auto-consciente. Quebrar a quarta parede.",
+        "tone": "Fast, chaotic, authentic. Like two friends screaming about science on Discord at 2 AM. Maximum energy. Meme-literate. Self-aware. Break the fourth wall.",
         "slang": "Mano, brabo, cringe, based, slay, goat, mid, sus, é real, surreal, aleatório, cancelado, ratio, lacrou, mitou, descoladíssimo, paia, mó",
         "vocab": "Explicar tudo via gaming, anime ou redes sociais. 'Buracos negros são o boss final da física.' Frases com menos de 15 palavras. Fragmentos OK. CAPS pra ênfase.",
         "cultural_refs": "Minecraft, One Piece, Felipe Neto, Casimiro, Cellbit, Winderson, T3ddy, TikTok Brasil, Twitch BR, Naruto, Jujutsu Kaisen, Cortes podcast, Flow Podcast clips",
@@ -240,7 +240,7 @@ PROFILES = {
     },
     ("pt", "health_wellness"): {
         "lang_label": "Portuguese", "audience_label": "Health & Wellness",
-        "tone": "Acolhedor, empático, baseado em ciência mas emocionalmente ressonante. Como um médico amigo que lê pesquisas de ponta. Stakes pessoais — 'isso afeta O SEU corpo.' Inspirador sem ser pregador.",
+        "tone": "Welcoming, empathetic, science-based but emotionally resonant. Like a doctor friend who reads cutting-edge research. Personal stakes — 'this affects YOUR body.' Inspiring without preaching.",
         "slang": "Biohacking, longevidade, otimizar, eixo intestino-cérebro, ritmo circadiano, saúde metabólica, jejum intermitente, banho de gelo, aterramento, regulação do sistema nervoso, mindfulness",
         "vocab": "Termos médicos com explicação imediata em linguagem simples. Conectar espaço/física à biologia humana. Telômeros, mitocôndrias, neuroplasticidade, microbioma — sempre o que significa pra SAÚDE deles.",
         "cultural_refs": "Drauzio Varella, Dr. Barakat, Saúde da Mente com Daniel Barros, Globo Repórter saúde, SUS (contexto), Nature Brasilis, academia brasileira, suplementação, Puravida",
@@ -249,7 +249,7 @@ PROFILES = {
     },
     ("pt", "scifi_curious"): {
         "lang_label": "Portuguese", "audience_label": "Sci-Fi Curious",
-        "tone": "Repleto de admiração, narrativa primeiro, acessível. Como um professor de ciências maneiro que faz você esquecer que está aprendendo. Entretenimento e educação em partes iguais. Construir espanto.",
+        "tone": "Filled with wonder, narrative-first, accessible. Like a cool science teacher who makes you forget you're learning. Entertainment and education in equal parts. Build awe.",
         "slang": "Mind-blow, plot twist, lore drop, multiverso, simulação confirmada, vibe viagem no tempo, galaxy brain, reality check, horror cósmico, mundo aberto, worldbuilding, Easter egg",
         "vocab": "Ciência tornada cinematográfica. Cada conceito ganha descrição digna de filme. Metáforas vívidas: 'Imagina o universo inteiro cabendo numa colher de chá.' Balance ciência real com cenários 'e se'.",
         "cultural_refs": "Interstellar, Dune, 3% (Netflix Brasil), Black Mirror, Nerdologia, Jovem Nerd, Kurzgesagt, SpaceTodayTV, Canaltech, Isaac Asimov, Arthur C. Clarke, Star Wars",
@@ -263,7 +263,7 @@ PROFILES = {
 
     ("es", "finance_listeners"): {
         "lang_label": "Spanish", "audience_label": "Finance Listeners",
-        "tone": "Serio pero apasionado. Como un analista de Wall Street que ama la ciencia ficción. Datos duros, confianza intelectual. Precisión con emoción. 'El dinero inteligente ya se está moviendo.'",
+        "tone": "Serious but passionate. Like a Wall Street analyst who loves sci-fi. Hard data, intellectual confidence. Precision with emotion. 'Smart money is already moving.'",
         "slang": "Rendimiento, cartera, inversión, disruption, game-changer, mercado alcista/bajista, apalancamiento, liquidez, yield, diversificación, tesis de inversión, upside, hedge",
         "vocab": "Ciencia vinculada al impacto de mercado. Descubrimientos como tendencias invertibles. TAM, curva S, disrupción. Cuántica/IA como tesis de inversión. Física como tendencia de mercado.",
         "cultural_refs": "Andrei Jikh (LATAM fans), El Economista, Bloomberg Línea, Mercado Libre, Nubank México, Kavak, Rappi, BBVA Research, Santander Innovation, La Bolsa Mexicana de Valores",
@@ -272,7 +272,7 @@ PROFILES = {
     },
     ("es", "millennials"): {
         "lang_label": "Spanish", "audience_label": "Millennials",
-        "tone": "Reflexivo, inteligente, con toque nostálgico. Como explicar ciencia fascinante a amigos listos tomando cerveza artesanal. Optimismo equilibrado. Profundidad bienvenida. Filosofía cotidiana.",
+        "tone": "Reflective, intelligent, with a nostalgic touch. Like explaining fascinating science to smart friends over craft beer. Balanced optimism. Depth welcome. Everyday philosophy.",
         "slang": "Mola, bro, de locos, posta, re copado, está heavy, ñoño con orgullo, mood, vibes, validado, gacho, chido, bacán, genial, la neta, orale",
         "vocab": "Ciencia accesible con contexto. Filosofía y física de la mano. Metáforas de la vida diaria — alquiler, carrera, crisis existencial. Temas complejos a través de experiencia vivida.",
         "cultural_refs": "La Casa de Papel, Dark (Netflix), Matrix, Interstellar, El Ministerio del Tiempo, Operación Triunfo, Mafalda, Borges, Club de Cuervos, Guillermo del Toro, Quantum Break",
@@ -281,7 +281,7 @@ PROFILES = {
     },
     ("es", "tech_enthusiasts"): {
         "lang_label": "Spanish", "audience_label": "Tech Enthusiasts",
-        "tone": "Preciso, riguroso, curiosidad profunda. Como un senior developer explicando investigación de vanguardia. First-principles. Respetar su inteligencia. Deep-dive en mecanismos. Elegancia lógica.",
+        "tone": "Precise, rigorous, deeply curious. Like a senior developer explaining cutting-edge research. First-principles. Respect their intelligence. Deep-dive into mechanisms. Logical elegance.",
         "slang": "Deployar, shippear, edge case, deuda técnica, código espagueti, funciona en mi máquina, rubber ducking, overengineered, stack, sprint, pull request, merge conflict, legacy code",
         "vocab": "Terminología técnica real — explicar una vez, luego usar. Referenciar papers. Big-O como metáfora, analogías de API, pensamiento de diseño de sistemas. Fenómenos naturales como sistemas distribuidos.",
         "cultural_refs": "Platzi, HolaMundo, BettaTech, Midudev, MoureDev, Xataka, Genbeta, GitHub Trending, Hacker News, Stack Overflow en español, Telefónica Tech, Cabify engineering",
@@ -290,7 +290,7 @@ PROFILES = {
     },
     ("es", "gen_z"): {
         "lang_label": "Spanish", "audience_label": "Gen Z",
-        "tone": "Ultra-rápido, auténtico, caótico pero brillante. Como dos amigos gritando sobre ciencia en Discord a las 2 AM. Energía máxima. Meme-literate. Self-aware. Romper la cuarta pared constantemente.",
+        "tone": "Ultra-fast, authentic, chaotic but brilliant. Like two friends screaming about science on Discord at 2 AM. Maximum energy. Meme-literate. Self-aware. Break the fourth wall constantly.",
         "slang": "Bro, lol, random, cringe, based, slay, goat, mid, sus, es real, pana, marico (VE), wey/güey (MX), capo, re loco, posta, manco, tryhard, top, épico, GG",
         "vocab": "Explicar todo vía gaming, anime o redes sociales. 'Los agujeros negros son el boss final de la física.' Frases de menos de 15 palabras. Fragmentos OK. MAYÚSCULAS para énfasis.",
         "cultural_refs": "Minecraft, One Piece, Ibai, AuronPlay, ElRubius, TheGrefg, Jujutsu Kaisen, TikTok LATAM, Twitch ES, Naruto, Demon Slayer, Luisito Comunica, Windygirk",
@@ -299,7 +299,7 @@ PROFILES = {
     },
     ("es", "health_wellness"): {
         "lang_label": "Spanish", "audience_label": "Health & Wellness",
-        "tone": "Cálido, empático, con base científica pero emocionalmente resonante. Como un médico amigo que lee investigación de vanguardia. Stakes personales — 'esto afecta TU cuerpo.' Inspirador sin ser sermón.",
+        "tone": "Warm, empathetic, science-based but emotionally resonant. Like a doctor friend who reads cutting-edge research. Personal stakes — 'this affects YOUR body.' Inspiring without sermonizing.",
         "slang": "Biohacking, longevidad, optimizar, eje intestino-cerebro, ritmo circadiano, salud metabólica, ayuno intermitente, baño de hielo, grounding, regulación del sistema nervioso, mindfulness",
         "vocab": "Términos médicos con explicación inmediata en lenguaje simple. Conectar espacio/física con biología humana. Telómeros, mitocondrias, neuroplasticidad, microbioma — siempre qué significa para SU salud.",
         "cultural_refs": "Carlos López-Otín, DW Español ciencia, Aprendemos Juntos, Saber Vivir TVE, La Sexta salud, Fitness Revolucionario, biohacking hispano, Dr. La Rosa, Yoga con Adriene (ES)",
@@ -308,7 +308,7 @@ PROFILES = {
     },
     ("es", "scifi_curious"): {
         "lang_label": "Spanish", "audience_label": "Sci-Fi Curious",
-        "tone": "Maravillado, narrativa primero, accesible. Como un profe de ciencias cool que te hace olvidar que estás aprendiendo. Entretenimiento y educación a partes iguales. Construir asombro. Momentos 'ostia'.",
+        "tone": "Wonder-filled, narrative-first, accessible. Like a cool science teacher who makes you forget you're learning. Entertainment and education in equal parts. Build awe. Create 'wow' moments.",
         "slang": "Mind-blow, plot twist, lore drop, multiverso, simulación confirmada, vibes de viaje temporal, galaxy brain, reality check, horror cósmico, mundo abierto, worldbuilding, Easter egg",
         "vocab": "Ciencia hecha cinematográfica. Cada concepto recibe descripción digna de película. Metáforas vívidas: 'Imagina el universo entero cabiendo en una cucharita.' Balance ciencia real con escenarios '¿y si?'.",
         "cultural_refs": "Interstellar, Dune, Black Mirror, Fundación (Asimov), Borges, Cuarto Milenio, El Ministerio del Tiempo, Star Wars, Kurzgesagt (ES), CdeCiencia, QuantumFracture, Date un Vlog",
