@@ -5,10 +5,16 @@ description: End-to-end German sci-fi podcast production — from topic to YouTu
 
 # 🎬 Podcast Production Pipeline
 
-**Input:** Topic from user  
-**Output:** German MP3 + 16:9 visuals + CapCut walkthrough
+> **ARCHITECTURE (never forget this):**  
+> The UI/dashboard is **INPUT ONLY** — it collects the topic, language, audience, and shows progress.  
+> **Antigravity is the brain and executor.** After input is received, I run all phases autonomously.  
+> No other AI, no automation bot. Just me, the tools, and the output folders.
+
+**Input:** Topic from user via UI  
+**Output:** German MP3 + 16:9 visuals + CapCut walkthrough — all in the episode folder
 
 > **Windows note:** Always set `$env:PYTHONIOENCODING="utf-8"` before any Python command.
+
 
 ---
 
@@ -202,17 +208,30 @@ Read `transcript.txt` and create `$EP/5_deliverables/SLIDE_SOURCE.md`:
 
 ## PHASE 6 — Generate 16:9 Visuals
 
-> 🎨 **IMAGE QUALITY RULE:** Always use the highest quality prompts. Include cinematic, photorealistic, ultra-detailed keywords to force the Pro generation model. Never use vague prompts — be extremely specific.
+> 🎨 **IMAGE QUALITY RULE — MAXIMUM PRO:**  
+> The `generate_image` tool selects quality based on prompt specificity.  
+> **Ultra-detailed = Pro model. Vague = Fast model. Never be vague.**
 
-For each row in `SLIDE_SOURCE.md`, generate a cinematic image using the `generate_image` tool.
+For each row in `SLIDE_SOURCE.md`, generate a cinematic image.
 
-**Mandatory prompt template (PRO quality keywords required):**
+**MAXIMUM QUALITY prompt template (mandatory for every single slide):**
 ```
-Ultra-wide cinematic 16:9 aspect ratio. [Extremely detailed scene description].
-Photorealistic or [style from memory]. Ultra-high detail, film-grade lighting,
-8K resolution, [specific mood]. No text, no watermarks, no logos, no UI elements.
-Cinematic color grading.
+Ultra-wide cinematic 16:9 aspect ratio. Hyper-realistic, 8K resolution, shot on 
+RED MONSTRO cinema camera, 24mm anamorphic lens, f/1.8 bokeh. [Extremely specific scene: 
+every element, every light source, color temperature, time of day, weather, distance, 
+texture]. Masterful film-grade color grading — [specific color palette: e.g. 
+deep teal shadows, warm orange highlights, desaturated midtones]. 
+Volumetric atmospheric haze. Award-winning cinematography composition. 
+No text, no watermarks, no logos, no UI, no watermarks. 
+Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain, 
+flat colors, amateur, low quality.
 ```
+
+**Always describe light specifically:**
+- "Hard directional rim light from upper left, casting long shadows..."
+- "Soft diffused natural window light, golden hour glow..."  
+- "Practical light from glowing screens, cool blue-green tones..."
+- "Drone-mounted LED array, clinical white, forensic clarity..."
 
 **Check visual style from memory:**
 ```powershell
@@ -222,19 +241,17 @@ Cinematic color grading.
 
 Save all images to `$EP/4_visuals/` as `slide01_<desc>.png`, `slide02_<desc>.png`, etc.
 
-**MANDATORY: Force 16:9 1920×1080 after every image batch:**
+**MANDATORY STEP: Force 1920×1080 after every batch:**
 ```powershell
 $env:PYTHONIOENCODING="utf-8"
-# Converts ALL images in visuals folder to exact 1920x1080 YouTube format
 python scripts/force_16x9.py "$EP/4_visuals/"
 ```
-
-This uses ffmpeg `scale=1920:1080 + pad` to letterbox any aspect ratio into perfect 16:9.
-Install ffmpeg if not available: `winget install ffmpeg`
+This ffmpeg scale+pad step is **non-negotiable**. Every image in the pipeline must be exactly 1920×1080 before CapCut.
 
 ```powershell
-& $MEM log $EID visuals "N images generated + force_16x9 applied → 1920x1080"
+& $MEM log $EID visuals "N slides generated (PRO prompts) + force_16x9 → 1920x1080"
 ```
+
 
 
 ---
