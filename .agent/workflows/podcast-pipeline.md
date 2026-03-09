@@ -242,6 +242,12 @@ Read `<ep_path>/5_deliverables/SLIDE_SOURCE.md`. Write ALL prompts upfront befor
 
 **MAXIMUM QUALITY prompt template (mandatory for every single slide):**
 ```
+CRITICAL COMPOSITION RULE: This image MUST be composed as a wide horizontal 16:9 cinematic
+frame. Place ALL key subjects, faces, and focal points in the CENTER HORIZONTAL THIRD of the
+frame — never at the extreme left or right edges. The left and right 20% of the frame should
+contain only background/atmosphere (sky, fog, space, terrain). This ensures a perfect
+center-crop to 1920×1080 with zero detail loss.
+
 Ultra-wide cinematic 16:9 aspect ratio. Hyper-realistic, 8K resolution, shot on
 RED MONSTRO cinema camera, 24mm anamorphic lens, f/1.8 bokeh. [Extremely specific scene:
 every element, every light source, color temperature, time of day, weather, distance,
@@ -249,8 +255,12 @@ texture]. Masterful film-grade color grading — [specific color palette].
 Volumetric atmospheric haze. Award-winning cinematography composition.
 No text, no watermarks, no logos, no UI.
 Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain,
-flat colors, amateur, low quality.
+flat colors, amateur, low quality, portrait orientation, square crop, vertical frame.
 ```
+
+> **Why this matters:** `force_16x9.py` uses **crop-to-fill** (not pad). It scales the
+> image up to cover 1920×1080 then center-crops. If subjects are at the edges they get cut.
+> Always keep key content in the center horizontal band.
 
 **Always describe light specifically:**
 - "Hard directional rim light from upper left, casting long shadows..."
