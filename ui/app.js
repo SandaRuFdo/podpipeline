@@ -693,9 +693,22 @@ async function runPipeline(eid) {
 
   // Copy to clipboard
   try {
-    await navigator.clipboard.writeText(data.prompt);
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(data.prompt);
+    else throw new Error("Clipboard API unavailable");
     toast("✅ Prompt copied to clipboard!", "success");
-  } catch (_) { }
+  } catch (_) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = data.prompt;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+      toast("✅ Prompt copied to clipboard!", "success");
+    } catch (e) { }
+  }
 
   showPromptModal(data.prompt, data.resume_phase);
 }
@@ -745,10 +758,7 @@ function showPromptModal(prompt, resumePhase) {
         ">${escHtml(prompt)}</pre>
       </div>
       <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px">
-        <button onclick="
-          navigator.clipboard.writeText(document.getElementById('pipeline-prompt-text').textContent);
-          toast('Copied!','success');
-        " style="
+        <button id="modal-copy-btn" style="
           flex:1;padding:10px;border-radius:8px;border:none;
           background:var(--accent);color:#fff;font-size:14px;
           font-weight:600;cursor:pointer;
@@ -763,6 +773,25 @@ function showPromptModal(prompt, resumePhase) {
 
   document.body.appendChild(modal);
   modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
+  document.getElementById("modal-copy-btn").addEventListener("click", async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(prompt);
+      else throw new Error("Clipboard API unavailable");
+      toast("Copied!", "success");
+    } catch (_) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = prompt;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        toast("Copied!", "success");
+      } catch (e) { toast("Failed to copy", "error"); }
+    }
+  });
 }
 
 function exportEpisode(eid) {
