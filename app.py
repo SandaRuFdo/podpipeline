@@ -512,25 +512,29 @@ def suggest():
 # ── SKILL PROFILES ─────────────────────────────────────────────────────────────
 
 def _ensure_skill_profiles_table():
-    """Create skill_profiles table if it doesn't exist yet."""
+    """Create skill_profiles table if it doesn't exist yet (matches memory.py init schema)."""
     import sqlite3
     db_path = BASE / ".agent/skills/memory/podcast_memory.db"
     conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS skill_profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lang TEXT NOT NULL,
-            audience TEXT NOT NULL,
+            lang_code TEXT NOT NULL,
+            audience_key TEXT NOT NULL,
             lang_label TEXT,
             audience_label TEXT,
             tone TEXT,
-            vocab TEXT,
-            slang TEXT,
+            vocabulary TEXT,
+            slang_phrases TEXT,
             cultural_refs TEXT,
-            hooks TEXT,
-            avoid TEXT,
-            created_at TIMESTAMP DEFAULT (datetime('now')),
-            UNIQUE(lang, audience)
+            writing_style TEXT,
+            hook_patterns TEXT,
+            taboos TEXT,
+            research_notes TEXT,
+            research_sources TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(lang_code, audience_key)
         )
     """)
     conn.commit()
@@ -542,7 +546,7 @@ def list_skill_profiles():
     _ensure_skill_profiles_table()
     try:
         conn = _db()
-        rows = conn.execute("SELECT * FROM skill_profiles ORDER BY lang, audience").fetchall()
+        rows = conn.execute("SELECT * FROM skill_profiles ORDER BY lang_code, audience_key").fetchall()
         conn.close()
         return jsonify([dict(r) for r in rows])
     except Exception:
@@ -550,14 +554,14 @@ def list_skill_profiles():
 
 
 def _lookup_skill_profile(lang, audience):
-    """Shared logic: check if a skill profile exists for lang × audience."""
+    """Shared logic: check if a skill profile exists for lang_code × audience_key."""
     _ensure_skill_profiles_table()
     db_path = BASE / ".agent/skills/memory/podcast_memory.db"
     try:
         conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT * FROM skill_profiles WHERE lang=? AND audience=?", (lang, audience)
+            "SELECT * FROM skill_profiles WHERE lang_code=? AND audience_key=?", (lang, audience)
         ).fetchone()
         conn.close()
         if row:
@@ -677,11 +681,12 @@ def build_skill_profile():
         conn = sqlite3.connect(str(db_path), check_same_thread=False, timeout=5)
         conn.execute("""
             INSERT OR REPLACE INTO skill_profiles
-            (lang, audience, lang_label, audience_label, tone, vocab, slang, cultural_refs, hooks, avoid)
+            (lang_code, audience_key, lang_label, audience_label, tone,
+             vocabulary, slang_phrases, cultural_refs, hook_patterns, taboos)
             VALUES (?,?,?,?,?,?,?,?,?,?)
         """, (lang, audience, lang_label, aud_label,
-              profile["tone"], profile["vocab"], profile["slang"],
-              profile["cultural_refs"], profile["hooks"], profile["avoid"]))
+              profile["tone"], profile.get("vocab", ""), profile.get("slang", ""),
+              profile.get("cultural_refs", ""), profile.get("hooks", ""), profile.get("avoid", "")))
         conn.commit()
         conn.close()
 

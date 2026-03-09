@@ -328,16 +328,26 @@ def main():
 
     conn = sqlite3.connect(db, check_same_thread=False, timeout=10)
 
-    # Ensure table exists
+    # Ensure table exists with the correct schema (matches memory.py init)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS skill_profiles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lang TEXT NOT NULL, audience TEXT NOT NULL,
-            lang_label TEXT, audience_label TEXT,
-            tone TEXT, vocab TEXT, slang TEXT,
-            cultural_refs TEXT, hooks TEXT, avoid TEXT,
+            lang_code TEXT NOT NULL,
+            audience_key TEXT NOT NULL,
+            lang_label TEXT,
+            audience_label TEXT,
+            tone TEXT,
+            vocabulary TEXT,
+            slang_phrases TEXT,
+            cultural_refs TEXT,
+            writing_style TEXT,
+            hook_patterns TEXT,
+            taboos TEXT,
+            research_notes TEXT,
+            research_sources TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(lang, audience)
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(lang_code, audience_key)
         )
     """)
     conn.commit()
@@ -348,7 +358,7 @@ def main():
 
     for (lang, audience), profile in PROFILES.items():
         existing = conn.execute(
-            "SELECT id FROM skill_profiles WHERE lang=? AND audience=?",
+            "SELECT id FROM skill_profiles WHERE lang_code=? AND audience_key=?",
             (lang, audience)
         ).fetchone()
 
@@ -359,26 +369,35 @@ def main():
         if existing and force:
             conn.execute("""
                 UPDATE skill_profiles
-                SET lang_label=?, audience_label=?, tone=?, vocab=?, slang=?,
-                    cultural_refs=?, hooks=?, avoid=?, created_at=CURRENT_TIMESTAMP
-                WHERE lang=? AND audience=?
+                SET lang_label=?, audience_label=?, tone=?, vocabulary=?, slang_phrases=?,
+                    cultural_refs=?, hook_patterns=?, taboos=?, updated_at=CURRENT_TIMESTAMP
+                WHERE lang_code=? AND audience_key=?
             """, (
                 profile["lang_label"], profile["audience_label"],
-                profile["tone"], profile["vocab"], profile["slang"],
-                profile["cultural_refs"], profile["hooks"], profile["avoid"],
+                profile["tone"],
+                profile.get("vocab", ""),
+                profile.get("slang", ""),
+                profile.get("cultural_refs", ""),
+                profile.get("hooks", ""),
+                profile.get("avoid", ""),
                 lang, audience
             ))
             updated += 1
         else:
             conn.execute("""
                 INSERT INTO skill_profiles
-                (lang, audience, lang_label, audience_label, tone, vocab, slang, cultural_refs, hooks, avoid)
+                (lang_code, audience_key, lang_label, audience_label, tone,
+                 vocabulary, slang_phrases, cultural_refs, hook_patterns, taboos)
                 VALUES (?,?,?,?,?,?,?,?,?,?)
             """, (
                 lang, audience,
                 profile["lang_label"], profile["audience_label"],
-                profile["tone"], profile["vocab"], profile["slang"],
-                profile["cultural_refs"], profile["hooks"], profile["avoid"],
+                profile["tone"],
+                profile.get("vocab", ""),
+                profile.get("slang", ""),
+                profile.get("cultural_refs", ""),
+                profile.get("hooks", ""),
+                profile.get("avoid", ""),
             ))
             inserted += 1
 
@@ -386,7 +405,7 @@ def main():
 
     total = conn.execute("SELECT COUNT(*) FROM skill_profiles").fetchone()[0]
     by_lang = conn.execute(
-        "SELECT lang, COUNT(*) FROM skill_profiles GROUP BY lang ORDER BY lang"
+        "SELECT lang_code, COUNT(*) FROM skill_profiles GROUP BY lang_code ORDER BY lang_code"
     ).fetchall()
 
     conn.close()
@@ -400,8 +419,8 @@ def main():
     print(f"  Total:    {total} profiles in DB")
     print(f"{'='*60}")
     for lang, count in by_lang:
-        flag = {"en": "🇬🇧", "de": "🇩🇪", "fr": "🇫🇷", "pt": "🇧🇷", "es": "🇪🇸"}.get(lang, "🌐")
-        print(f"  {flag} {lang}: {count} profiles")
+        label = {"en": "[EN]", "de": "[DE]", "fr": "[FR]", "pt": "[PT]", "es": "[ES]"}.get(lang, f"[{lang.upper()}]")
+        print(f"  {label} {lang}: {count} profiles")
     print(f"{'='*60}\n")
 
 
