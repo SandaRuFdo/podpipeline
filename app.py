@@ -158,13 +158,13 @@ def list_episodes():
     """Direct SQLite with dynamic status calculation from pipeline phases."""
     try:
         conn = _db()
-        # Join with pipeline to see if any phases are running/done for this episode
+        # Join with pipeline_state to see if any phases are running/done for this episode
         rows = conn.execute("""
             SELECT e.*, 
-                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id) as total_phases,
-                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'done') as done_phases,
-                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'running') as running_phases,
-                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'failed') as failed_phases
+                   (SELECT COUNT(*) FROM pipeline_state p WHERE p.episode_id = e.id) as total_phases,
+                   (SELECT COUNT(*) FROM pipeline_state p WHERE p.episode_id = e.id AND p.status = 'done') as done_phases,
+                   (SELECT COUNT(*) FROM pipeline_state p WHERE p.episode_id = e.id AND p.status = 'running') as running_phases,
+                   (SELECT COUNT(*) FROM pipeline_state p WHERE p.episode_id = e.id AND p.status = 'failed') as failed_phases
             FROM episodes e 
             ORDER BY e.season, e.episode
         """).fetchall()
@@ -192,6 +192,7 @@ def list_episodes():
             
         return jsonify(results)
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify([])  # Return empty list on error
 
 
