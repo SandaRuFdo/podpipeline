@@ -277,37 +277,91 @@ Run the full pipeline from start to finish for this episode. Do not stop until a
 {phase_summary}
 
 ## Instructions
-1. Read the full workflow: `.agent/skills/dynamic-podcast-director/SKILL.md` (use for all phases)
+1. Read the full workflow: `.agent/workflows/podcast-pipeline.md` AND `.agent/skills/dynamic-podcast-director/SKILL.md`
 2. Resume from **{resume_phase}** phase and run ALL remaining phases to completion
 3. After EACH phase completes, call:
    `python scripts/update_phase.py {eid} <phase> done`
    This updates the dashboard live.
-4. **IMPORTANT**: Use `python scripts/log_phase.py {eid} "Message" [info|success|error|step]` to push human-readable Live Logs to the user's browser terminal. Do this *frequently* so the user sees what you are doing (e.g. "Drafting script...", "Found 3 sources").
+4. **IMPORTANT**: Use `python scripts/log_phase.py {eid} "Message" [info|success|error|step]` frequently so the user can see live progress in the browser terminal.
 5. Do NOT stop until deliverables phase is done and walkthrough.md exists.
 
-## ⏱️ PHASE 4.5 — YouTube Metadata Pack (Run IN PARALLEL during audio gen wait)
+---
 
-> While `notebooklm artifact wait` is running in Phase 4, do these steps — zero extra time cost.
+## ⏱️ WAIT WINDOW 1 — During Audio Generation (`notebooklm artifact wait`)
+
+> Audio gen takes 15–20 min. During this wait, run ALL of the following in parallel:
+
+### Phase 4.5 — YouTube Metadata Pack
 
 **Step 4.5.1 — Generate titles, description & thumbnail prompt:**
 ```bash
-# Call the API — it streams progress and auto-saves youtube_meta.json + thumbnail_prompt.txt
 curl -s -X POST http://localhost:5000/api/episodes/{eid}/generate-youtube-meta > /dev/null
 python scripts/log_phase.py {eid} "📋 YouTube metadata pack generated" success
 ```
 
 **Step 4.5.2 — Generate the thumbnail image:**
-1. Read prompt file: `<ep_path>/5_deliverables/thumbnail_prompt.txt`
+1. Read prompt: `<ep_path>/5_deliverables/thumbnail_prompt.txt`
 2. Call `generate_image(prompt=<file content>)` → save to `<ep_path>/5_deliverables/thumbnail.png`
-3. Update thumbnail path via API:
-   `POST http://localhost:5000/api/episodes/{eid}/youtube-meta` — body: `{{"thumbnail_path": "<path>"}}`
+3. `POST http://localhost:5000/api/episodes/{eid}/youtube-meta` body: `{{"thumbnail_path": "<path>"}}`
 4. `python scripts/log_phase.py {eid} "🖼️ Thumbnail generated" success`
+
+### Phase 4.6 — Supporting Visuals (IDLE-TIME LOOP — start immediately after 4.5)
+
+> 🔴 **MANDATORY** — Start this loop as soon as Phase 4.5 is done. DO NOT SKIP.
+> These are NOT transcript-based. Generate from topic research + episode context only.
+> **STOP immediately when `podcast.mp3` download completes.**
+
+For each supporting visual (until stop signal):
+1. Pick a sub-topic or concept from the research sources
+2. Call `generate_image` with a cinematic 16:9 prompt for that concept
+3. Save to `<ep_path>/4_visuals/support_<N>_<slug>.png`
+4. `python scripts/log_phase.py {eid} "🎨 Supporting visual <N> generated" step`
+5. Check: does `<ep_path>/3_audio/podcast.mp3` exist now? → YES: stop loop immediately
+
+```python
+# Stop condition check after EACH image:
+import os
+if os.path.exists("<ep_path>/3_audio/podcast.mp3"):
+    break  # podcast downloaded — stop supporting visuals now
+```
+
+---
+
+## ⏱️ WAIT WINDOW 2 — During Transcription (`transcribe.py` running)
+
+> Transcription takes 5–8 min depending on podcast length and GPU.
+> During this wait, **continue generating supporting visuals** if visual budget not yet reached.
+
+### Phase 4.6 continues — Supporting Visuals (second window)
+
+> 🔴 **MANDATORY** — Resume the supporting visual loop immediately after starting transcription.
+> **STOP immediately when `transcript.txt` finishes writing.**
+
+For each supporting visual (until stop signal):
+1. Pick another concept from research (avoid repeating previous)
+2. Call `generate_image` with cinematic 16:9 prompt
+3. Save to `<ep_path>/4_visuals/support_<N>_<slug>.png`
+4. `python scripts/log_phase.py {eid} "🎨 Supporting visual <N> generated" step`
+5. Check: does `<ep_path>/3_audio/transcript.txt` exist AND has content? → YES: stop loop
+
+```python
+import os
+t = "<ep_path>/3_audio/transcript.txt"
+if os.path.exists(t) and os.path.getsize(t) > 100:
+    break  # transcript ready — stop and proceed to key visuals
+```
+
+After transcript is ready → run `python scripts/force_16x9.py <ep_path>/4_visuals/` to resize ALL visuals.
+Then log: `python scripts/log_phase.py {eid} "✅ Supporting visuals complete — {count} generated" success`
+
+---
 
 ## Working Directory
 `episodes/S{int(season):02d}/E{int(episode):02d}_*/`
 
 Start now. Run phase: **{resume_phase}**
 """
+
 
 
     return jsonify({"prompt": prompt, "episode_id": eid, "resume_phase": resume_phase})
