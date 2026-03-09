@@ -193,10 +193,14 @@ def create_episode():
     def run():
         cmd = [
             sys.executable, str(BASE / "core" / "new_episode.py"),
-            "--season", str(d["season"]), "--episode", str(d["episode"]),
-            "--slug", d["slug"], "--title", d["title_de"],
-            "--lang", lang_code, "--lang-name", lang_name,
-            "--topic", d["topic"],
+            "--season",        str(d["season"]),
+            "--episode",       str(d["episode"]),
+            "--slug",          d["slug"],
+            "--title",         d["title_de"],
+            "--language",      lang_code,
+            "--language-name", lang_name,
+            "--audience",      audience,
+            "--topic",         d["topic"],
             "--force",
         ]
         if d.get("title_en"): cmd += ["--title-en", d["title_en"]]
@@ -205,20 +209,7 @@ def create_episode():
         for line in proc.stdout:
             q.put({"type":"line","text":line.rstrip()})
         proc.wait()
-
-        # Store language + audience in memory
-        import re
-        lines_so_far = list(q.queue)
-        for item in lines_so_far:
-            m = re.search(r"ID\s*[:：]\s*(\d+)", item.get("text",""))
-            if m:
-                eid = int(m.group(1))
-                mem_raw("episode", "update", eid, "output_language", lang_code)
-                mem_raw("episode", "update", eid, "language_name", lang_name)
-                mem_raw("episode", "update", eid, "target_audience", d.get("target_audience", "scifi_curious"))
-                mem_raw("pipeline", "init", eid)
-                break
-
+        # language/audience are now saved inside new_episode.py directly — no queue scan needed
         q.put({"type":"done","ok": proc.returncode == 0})
 
     threading.Thread(target=run, daemon=True).start()

@@ -56,12 +56,13 @@ def main():
     p.add_argument("--season",   "-s", type=int, default=1)
     p.add_argument("--episode",  "-e", type=int, required=True)
     p.add_argument("--slug",          required=True,  help="Short folder name e.g. Dark_Matter")
-    p.add_argument("--title",    "-d", required=True,  help="Episode title in output language")
-    p.add_argument("--title-en", "-n", default=None,   help="English title (optional)")
-    p.add_argument("--lang",           default="en",    help="Output language code (e.g. de, en, es)")
-    p.add_argument("--lang-name",      default="English", help="Output language name (e.g. German)")
-    p.add_argument("--topic",    "-t", required=True,  help="Topic description")
-    p.add_argument("--force",         action="store_true", help="Overwrite existing folder")
+    p.add_argument("--title",         "-d", required=True,  help="Episode title in output language")
+    p.add_argument("--title-en",       "-n", default=None,   help="English title (optional)")
+    p.add_argument("--language",             default="en",    help="Output language code (e.g. de, en, es)")
+    p.add_argument("--language-name",        default="English", help="Output language name (e.g. German)")
+    p.add_argument("--audience",             default="scifi_curious", help="Target audience key")
+    p.add_argument("--topic",          "-t", required=True,  help="Topic description")
+    p.add_argument("--force",                action="store_true", help="Overwrite existing folder")
     args = p.parse_args()
 
     # Paths
@@ -69,7 +70,7 @@ def main():
     ep_dir     = BASE / f"episodes/S{args.season:02d}/E{args.episode:02d}_{slug_clean}"
     template   = BASE / "_template"
 
-    banner(f"NEW EPISODE: S{args.season:02d}E{args.episode:02d} — {args.title} [{args.lang.upper()}]")
+    banner(f"NEW EPISODE: S{args.season:02d}E{args.episode:02d} — {args.title} [{args.language.upper()}]")
 
     # ── Step 1: Check topic in memory ────────────────────────────────────────
     step(1, "Checking topic in memory...")
@@ -106,14 +107,15 @@ def main():
 ## Episode Info
 - Season: {args.season}
 - Episode: {args.episode}
-- Language: {args.lang_name} ({args.lang})
+- Language: {args.language_name} ({args.language})
+- Audience: {args.audience}
 - Topic: {args.topic}
 - Status: planned
 - NotebookLM ID: (pending)
 
 ## Folder Structure
 - `1_research/` — Source files (YouTube transcripts, PDFs, Wikipedia)
-- `2_script/`   — Script in {args.lang_name} (SCRIPT_{args.lang.upper()}.md) + English translation (SCRIPT_EN.md)
+- `2_script/`   — Script in {args.language_name} (SCRIPT_{args.language.upper()}.md) + English translation (SCRIPT_EN.md)
 - `3_audio/`    — podcast.mp3 + transcript.txt (with timestamps)
 - `4_visuals/`  — 16:9 cinematic images (slide01_*.png ...)
 - `5_deliverables/` — walkthrough.md (CapCut guide) + SLIDE_SOURCE.md
@@ -129,15 +131,20 @@ def main():
     result = run_mem(*mem_args)
     print(f"  {result}")
 
-    # Extract episode ID
+    # Extract episode ID — match "ID:3", "ID: 3", "ID：3" robustly
     eid = None
-    match = re.search(r"ID:(\d+)", result)
+    match = re.search(r"ID\s*[:：]\s*(\d+)", result)
     if match:
         eid = match.group(1)
-        run_mem("episode", "update", eid, "ep_path", str(ep_dir))
+        run_mem("episode", "update", eid, "ep_path",         str(ep_dir))
+        run_mem("episode", "update", eid, "output_language", args.language)
+        run_mem("episode", "update", eid, "language_name",   args.language_name)
+        run_mem("episode", "update", eid, "target_audience", args.audience)
         run_mem("pipeline", "init", eid)
         run_mem("pipeline", "set", eid, "setup", "done")
         run_mem("log", eid, "setup", "Episode created")
+        ok(f"Language saved: {args.language_name} ({args.language})")
+        ok(f"Audience saved: {args.audience}")
 
     ok(f"Memory ID: {eid or '?'}")
 
@@ -155,14 +162,15 @@ def main():
             print(f"  {line}")
 
     # ── Done ─────────────────────────────────────────────────────────────────
-    banner(f"READY! S{args.season:02d}E{args.episode:02d} — {args.title} [{args.lang.upper()}]", "\033[92m")
+    banner(f"READY! S{args.season:02d}E{args.episode:02d} — {args.title} [{args.language.upper()}]", "\033[92m")
     print(f"  Episode folder : episodes/S{args.season:02d}/E{args.episode:02d}_{slug_clean}/")
-    print(f"  Language       : {args.lang_name} ({args.lang})")
+    print(f"  Language       : {args.language_name} ({args.language})")
+    print(f"  Audience       : {args.audience}")
     print(f"  Memory ID      : {eid or '?'}")
     print()
     print("  Next steps:")
     print("  1. Research sources → 1_research/sources/")
-    print(f"  2. Write script     → 2_script/SCRIPT_{args.lang.upper()}.md + SCRIPT_EN.md")
+    print(f"  2. Write script     → 2_script/SCRIPT_{args.language.upper()}.md + SCRIPT_EN.md")
     print("  3. Run /podcast-pipeline")
     print()
 
