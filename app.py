@@ -38,6 +38,25 @@ def add_security_headers(response):
 
 _jobs: dict[str, queue.Queue] = {}
 
+# ── SSE dashboard broadcast ────────────────────────────────────────────────────
+# Each connected browser tab gets its own queue; _broadcast_refresh() sends a
+# 'dashboard-update' event to all of them so stats/phases refresh instantly.
+_dashboard_subscribers: dict[str, queue.Queue] = {}
+
+def _broadcast_refresh(event_data: dict = None):
+    """Push a dashboard-update SSE event to every connected browser tab."""
+    import json as _json
+    payload = _json.dumps(event_data or {"action": "refresh"})
+    msg = f"event: dashboard-update\ndata: {payload}\n\n"
+    dead = []
+    for sid, q in list(_dashboard_subscribers.items()):
+        try:
+            q.put_nowait(msg)
+        except Exception:
+            dead.append(sid)
+    for sid in dead:
+        _dashboard_subscribers.pop(sid, None)
+
 PHASE_ORDER = ["setup","research","script","audio","transcribe","visuals","deliverables","cinematic_setup"]
 
 
@@ -259,6 +278,8 @@ def export_episode(eid):
 def set_phase(eid):
     d = request.json
     mem_raw("pipeline", "set", eid, d["phase"], d["status"])
+    _broadcast_refresh({"action": "phase", "episode_id": eid,
+                        "phase": d["phase"], "status": d["status"]})
     return jsonify({"ok": True})
 
 
@@ -414,6 +435,40 @@ def get_stats():
             print(f"[/api/stats] DB error: {e}", file=sys.stderr)
 
     return jsonify({"stats": stats, "suggest": suggest, "analytics": analytics_data})
+
+
+# ── SSE — live dashboard push ──────────────────────────────────────────────────
+
+@app.route("/api/events")
+def sse_events():
+    """SSE stream — browser tabs subscribe here to receive instant dashboard
+    refresh signals whenever a pipeline phase changes.
+    Each tab gets its own queue; events are pushed by _broadcast_refresh().
+    """
+    sid = str(uuid.uuid4())
+    q: queue.Queue = queue.Queue(maxsize=32)
+    _dashboard_subscribers[sid] = q
+
+    def generate():
+        try:
+            # Heartbeat every 25 s to keep the connection alive through proxies
+            while True:
+                try:
+                    msg = q.get(timeout=25)
+                    yield msg
+                except queue.Empty:
+                    yield ":heartbeat\n\n"   # SSE comment — keeps socket alive
+        finally:
+            _dashboard_subscribers.pop(sid, None)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable nginx buffering if behind proxy
+        },
+    )
 
 
 # ── MEMORY ────────────────────────────────────────────────────────────────────
@@ -654,6 +709,8 @@ def set_phase_status(eid, phase, status):
     if status not in allowed_statuses:
         return jsonify({"error": f"Unknown status: {status}"}), 400
     mem_raw("pipeline", "set", eid, phase, status)
+    _broadcast_refresh({"action": "phase", "episode_id": eid,
+                        "phase": phase, "status": status})
     return jsonify({"ok": True, "episode_id": eid, "phase": phase, "status": status})
 
 
@@ -725,8 +782,12 @@ def _auto_detect_phases(eid, ep):
         d = p / "5_deliverables"
         return d.exists() and (d / "walkthrough.md").exists()
     def _script_exist():
-        s = p / "2_script" / "SCRIPT_DE.md"
-        return s.exists() and s.stat().st_size > 100
+        # Accept any SCRIPT_<LANG>.md (not just German)
+        script_dir = p / "2_script"
+        if not script_dir.exists():
+            return False
+        found = list(script_dir.glob("SCRIPT_*.md"))
+        return any(f.stat().st_size > 100 for f in found)
 
     checks = {
         "setup":        lambda: (p / "README.md").exists(),

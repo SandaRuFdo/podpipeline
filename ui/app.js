@@ -770,3 +770,51 @@ function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt
   await initAudiencePicker();
   navigate("dashboard");
 })();
+
+// ── LIVE DASHBOARD PUSH (SSE) ────────────────────────────────────────────────
+// Listens on /api/events — server sends 'dashboard-update' after every phase
+// change so the UI reflects reality without needing a manual page refresh.
+
+let _dashPollTimer = null;
+
+function _refreshActivePage() {
+  const active = document.querySelector('.page.active')?.id;
+  if (active === 'page-dashboard') loadDashboard();
+  if (active === 'page-analytics') loadAnalytics();
+  if (active === 'page-episodes') loadEpisodes();
+  // episode-detail auto-reloads via markPhase; memory rarely changes mid-run
+}
+
+(function initSSE() {
+  if (!window.EventSource) return;   // old browser fallback: rely on poll only
+  let es;
+
+  function connect() {
+    es = new EventSource('/api/events');
+
+    es.addEventListener('dashboard-update', ev => {
+      try {
+        const data = JSON.parse(ev.data);
+        console.debug('[SSE] dashboard-update', data);
+      } catch (_) { }
+      _refreshActivePage();
+    });
+
+    // Reconnect automatically on error (server restart, network blip)
+    es.onerror = () => {
+      es.close();
+      setTimeout(connect, 5000);   // retry after 5 s
+    };
+  }
+
+  connect();
+})();
+
+// ── 30-second fallback poll ───────────────────────────────────────────────────
+// Keeps dashboard fresh even if SSE is unavailable (behind a proxy that drops
+// long-lived connections, or if the user has EventSource blocked).
+
+setInterval(() => {
+  const active = document.querySelector('.page.active')?.id;
+  if (active === 'page-dashboard') loadDashboard();
+}, 30_000);
