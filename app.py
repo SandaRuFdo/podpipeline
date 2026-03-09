@@ -83,7 +83,7 @@ def _broadcast_log(eid: int, entry: dict):
     for sid in dead:
         _episode_log_queues.get(eid, {}).pop(sid, None)
 
-PHASE_ORDER = ["setup","research","script","audio","transcribe","visuals","deliverables","cinematic_setup"]
+PHASE_ORDER = ["setup","research","script","audio","youtube_meta","transcribe","visuals","deliverables","cinematic_setup"]
 
 
 # ── MEMORY HELPER ─────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ Run the full pipeline from start to finish for this episode. Do not stop until a
 {phase_summary}
 
 ## Instructions
-1. Read the full workflow: `.agent/skills/german-scifi-podcast/SKILL.md` (use for all phases)
+1. Read the full workflow: `.agent/skills/dynamic-podcast-director/SKILL.md` (use for all phases)
 2. Resume from **{resume_phase}** phase and run ALL remaining phases to completion
 3. After EACH phase completes, call:
    `python scripts/update_phase.py {eid} <phase> done`
@@ -426,6 +426,50 @@ def open_folder(eid):
         else:
             subprocess.Popen(["xdg-open", str(target)])
         return jsonify({"ok": True, "path": str(target)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── UPDATES ───────────────────────────────────────────────────────────────────
+
+@app.route("/api/check_updates", methods=["GET"])
+def check_updates_api():
+    try:
+        subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+        # Check if we are behind
+        behind = subprocess.run(["git", "rev-list", "HEAD..origin/main", "--count"], capture_output=True, text=True)
+        count = int(behind.stdout.strip() or "0")
+        
+        if count > 0:
+            # Get changes to CHANGELOG.md
+            diff = subprocess.run(
+                ["git", "diff", "HEAD..origin/main", "--", "CHANGELOG.md"],
+                capture_output=True, text=True
+            )
+            changes = []
+            for line in diff.stdout.splitlines():
+                if line.startswith("+") and not line.startswith("+++"):
+                    changes.append(line[1:])
+            
+            changes_text = "\n".join(changes).strip()
+            if not changes_text:
+                # If changelog wasn't updated, just show commits
+                log = subprocess.run(["git", "log", "HEAD..origin/main", "--oneline"], capture_output=True, text=True)
+                changes_text = log.stdout.strip()
+                
+            return jsonify({"update_available": True, "changes": changes_text})
+            
+        return jsonify({"update_available": False})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/update", methods=["POST"])
+def perform_update():
+    try:
+        res = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True)
+        if res.returncode != 0:
+            return jsonify({"error": "Failed to merge updates", "details": res.stderr}), 500
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -882,6 +926,278 @@ def set_phase_status(eid, phase, status):
     return jsonify({"ok": True, "episode_id": eid, "phase": phase, "status": status})
 
 
+# ── YOUTUBE METADATA ─────────────────────────────────────────────────────────
+
+def _youtube_meta_path(ep):
+    """Return Path to youtube_meta.json if ep_path is known."""
+    ep_path = ep.get("ep_path", "") if isinstance(ep, dict) else ""
+    if not ep_path:
+        return None
+    return Path(ep_path) / "5_deliverables" / "youtube_meta.json"
+
+
+@app.route("/api/episodes/<int:eid>/youtube-meta")
+def get_youtube_meta(eid):
+    """Return stored YouTube metadata for an episode."""
+    ep = mem("episode", "get", eid)
+    if not isinstance(ep, dict):
+        return jsonify({"error": "not found"}), 404
+    meta_path = _youtube_meta_path(ep)
+    if meta_path and meta_path.exists():
+        try:
+            return jsonify(json.loads(meta_path.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    return jsonify({})
+
+
+@app.route("/api/episodes/<int:eid>/youtube-meta", methods=["POST"])
+def save_youtube_meta(eid):
+    """Save YouTube metadata (title, description, thumbnail_path) to disk."""
+    ep = mem("episode", "get", eid)
+    if not isinstance(ep, dict):
+        return jsonify({"error": "not found"}), 404
+    meta_path = _youtube_meta_path(ep)
+    if not meta_path:
+        return jsonify({"error": "No ep_path set for this episode"}), 400
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    d = request.json or {}
+    # Merge with existing data if present
+    existing = {}
+    if meta_path.exists():
+        try:
+            existing = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    existing.update(d)
+    meta_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    mem_raw("pipeline", "set", eid, "youtube_meta", "done")
+    _broadcast_refresh({"action": "phase", "episode_id": eid, "phase": "youtube_meta", "status": "done"})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/episodes/<int:eid>/generate-youtube-meta", methods=["POST"])
+def generate_youtube_meta(eid):
+    """Generate YouTube metadata pack: 5 titles, description, thumbnail prompt.
+    Streams progress as SSE. Run this in parallel during audio generation wait."""
+    import datetime
+
+    ep = mem("episode", "get", eid)
+    if not isinstance(ep, dict):
+        return jsonify({"error": "not found"}), 404
+
+    meta_path = _youtube_meta_path(ep)
+    if not meta_path:
+        return jsonify({"error": "No ep_path set for this episode"}), 400
+
+    topic     = ep.get("topic", "Unknown Topic")
+    title_de  = ep.get("title_de") or ep.get("topic", "Unknown")
+    lang      = ep.get("output_language", "en")
+    lang_name = ep.get("language_name", "English")
+    audience  = ep.get("target_audience", "gen_z")
+    season    = ep.get("season", 1)
+    episode   = ep.get("episode", 1)
+    code      = f"S{int(season):02d}E{int(episode):02d}"
+
+    # Load audience data for CPM-aware tone
+    aud_data = mem("audience", "get", audience)
+    aud_label   = aud_data.get("label", audience) if isinstance(aud_data, dict) else audience
+    aud_desc    = aud_data.get("description", "") if isinstance(aud_data, dict) else ""
+    aud_tips    = aud_data.get("content_tips", "") if isinstance(aud_data, dict) else ""
+    aud_niches  = aud_data.get("best_niches", "") if isinstance(aud_data, dict) else ""
+    aud_emoji   = aud_data.get("emoji", "🎯") if isinstance(aud_data, dict) else "🎯"
+
+    # Load sources
+    sources = _get_sources(eid)
+    src_titles = [s["title"] for s in sources if s.get("title")] if sources else []
+
+    def generate():
+        import json as _json, time
+
+        def sse(log_msg, level="info"):
+            ts = datetime.datetime.now().strftime("%H:%M:%S")
+            _broadcast_log(eid, {"message": log_msg, "level": level, "ts": ts})
+            return f"data: {_json.dumps({'log': log_msg})}\n\n"
+
+        yield sse("🎬 Starting YouTube Metadata Pack generation…", "phase")
+        time.sleep(0.2)
+
+        # ── MARK PHASE RUNNING ────────────────────────────────────────────────
+        mem_raw("pipeline", "set", eid, "youtube_meta", "running")
+        _broadcast_refresh({"action": "phase", "episode_id": eid, "phase": "youtube_meta", "status": "running"})
+
+        # ── TITLE GENERATION ─────────────────────────────────────────────────
+        yield sse("✍️ Generating 5 viral title options…", "step")
+        time.sleep(0.3)
+
+        # Audience-specific title hook patterns
+        hook_styles = {
+            "finance_listeners": [
+                f"The {topic} Economy: Why This Changes Everything in {datetime.datetime.now().year}",
+                f"Is {title_de} The Biggest Financial Hidden Secret?",
+                f"What Banks Won't Tell You About {topic} (The Truth)",
+                f"{topic}: The Investment Angle No One Is Talking About",
+                f"How {topic} Will Make or Break Your Portfolio — Full Analysis",
+            ],
+            "gen_z": [
+                f"{title_de}: The Truth Is Way Weirder Than You Think 🤯",
+                f"Wait… {topic}?? This Changes EVERYTHING (No Cap)",
+                f"They've Been Hiding This About {topic} This Whole Time",
+                f"POV: You Just Found Out {topic} Is Actually Real",
+                f"{topic} Explained in 20 Min — You Won't Be Ready For This",
+            ],
+            "millennials": [
+                f"{title_de}: What They Taught Us Was a Lie",
+                f"The Untold Story of {topic} (This Will Blow Your Mind)",
+                f"We Need to Talk About {topic} — Here's What's Really Happening",
+                f"{topic}: A Deep Dive That Will Change How You See Everything",
+                f"Remember When We Thought We Understood {topic}? We Were Wrong.",
+            ],
+            "tech_enthusiasts": [
+                f"{topic}: The Technical Reality Nobody Is Discussing",
+                f"Deep Dive: {title_de} — Data, Science & The Real Truth",
+                f"How {topic} Actually Works (And Why It Matters More Than You Think)",
+                f"{topic} in {datetime.datetime.now().year}: The Definitive Technical Analysis",
+                f"Engineers Explain {topic}: The Science Behind the Mystery",
+            ],
+            "health_wellness": [
+                f"What {topic} Is Doing to Your Mind and Body (Scientists Are Shocked)",
+                f"{title_de}: The Connection to Human Health Nobody Talks About",
+                f"Could {topic} Hold the Key to Human Longevity?",
+                f"The {topic}–Health Link: New Research That Changes Everything",
+                f"Your Body On {topic}: A Full Scientific Breakdown",
+            ],
+        }
+
+        # Default fallback titles for any audience
+        default_titles = [
+            f"{title_de}: The Full Story (What They're Not Telling You)",
+            f"The Shocking Truth About {topic} — You Need To Hear This",
+            f"{topic}: Every Theory, Every Fact, Every Conspiracy — Analysed",
+            f"CLASSIFIED: The {topic} Files — Everything We Know",
+            f"{code} — {title_de}: A Deep Dive Into the Unknown",
+        ]
+
+        titles = hook_styles.get(audience, default_titles)
+        yield sse(f"✅ Generated {len(titles)} title options", "success")
+        time.sleep(0.2)
+
+        # ── DESCRIPTION GENERATION ───────────────────────────────────────────
+        yield sse("📝 Building YouTube description…", "step")
+        time.sleep(0.3)
+
+        today = datetime.datetime.now().strftime("%B %Y")
+        src_credit = "\n".join(f"  • {t}" for t in src_titles[:5]) if src_titles else "  • Original research"
+
+        # Niche hashtags from audience + topic
+        topic_words = [w.strip().lower() for w in topic.replace("-", " ").split() if len(w) > 3][:4]
+        topic_tags  = " ".join(f"#{w}" for w in topic_words)
+        niche_tags  = " ".join(f"#{n.strip().replace('-','').replace(' ','')}" for n in aud_niches.split(",")[:4]) if aud_niches else ""
+        lang_tag    = f"#{lang_name.lower().replace(' ','')}"
+        aud_tag     = f"#{aud_label.lower().replace(' ','').replace('&','and')}"
+
+        description = f"""🎙️ {code} — {title_de}
+
+Is everything we know about {topic} wrong? In this episode, we go deep into the evidence, the cover-ups, and the unanswered questions that mainstream media refuses to touch. Buckle up — this one will change how you see the world.
+
+{'📌 This episode was created for: ' + aud_label + ' — ' + aud_desc[:120] + '...' if aud_desc else ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━
+⏱️ TIMESTAMPS
+━━━━━━━━━━━━━━━━━━━━━━━
+00:00 — Introduction & Hook
+[Coming after transcription — timestamps will be added here]
+
+━━━━━━━━━━━━━━━━━━━━━━━
+📚 SOURCES
+━━━━━━━━━━━━━━━━━━━━━━━
+{src_credit}
+
+━━━━━━━━━━━━━━━━━━━━━━━
+🔔 NEVER MISS AN EPISODE
+━━━━━━━━━━━━━━━━━━━━━━━
+Subscribe + hit the bell to be notified the moment a new episode drops.
+Drop your thoughts in the comments — what do YOU think is really going on?
+
+━━━━━━━━━━━━━━━━━━━━━━━
+#podcast #{topic.replace(' ', '').replace('-', '')[:20]} {topic_tags} {niche_tags} {lang_tag} {aud_tag} #science #mystery #deepdive"""
+
+        yield sse("✅ Description built", "success")
+        time.sleep(0.2)
+
+        # ── THUMBNAIL PROMPT ─────────────────────────────────────────────────
+        yield sse("🖼️ Writing thumbnail image prompt…", "step")
+        time.sleep(0.2)
+
+        # Build a research-aware thumbnail prompt
+        keyword = topic.replace('"', '').strip()
+        # Map topic keywords to dramatic scene types
+        scene_map = [
+            (["alien", "reptile", "ufo", "extraterrestrial"], "alien ship descending through storm clouds over a modern government building at night, dramatic green tractor beam, cinematic"),
+            (["biden", "trump", "president", "politician"], "imposing government building with dramatic storm clouds, dark political atmosphere, heavy shadows, chiaroscuro lighting"),
+            (["quantum", "physics", "relativity", "particle"], "glowing quantum particle collision in a dark laboratory, light trails, deep blue and electric white, futuristic"),
+            (["space", "nasa", "galaxy", "cosmos", "star", "planet"], "breathtaking deep space vista, nebula in purple and gold, a lone astronaut silhouetted against a massive alien planet"),
+            (["dark matter", "black hole", "gravity", "wormhole"], "swirling black hole with gravitational lensing, deep purple and electric blue accents, stars distorted around the event horizon"),
+            (["ai", "artificial intelligence", "robot", "machine"], "hyper-realistic humanoid robot with glowing circuit eyes, chrome surface, dramatic industrial backdrop"),
+            (["conspiracy", "secret", "government", "classified"], "shadowy figure in front of illuminated classified documents, single desk lamp, deep shadows, film noir atmosphere"),
+            (["health", "longevity", "biohack", "conscious"], "human DNA double helix glowing in medical blue, cells transforming, clean scientific lab setting"),
+            (["crypto", "finance", "stock", "invest"], "dramatic golden bull on Wall Street at dusk, glowing stock chart overlaid, cinematic financial power"),
+        ]
+
+        scene_desc = f"dramatic cinematic scene representing the concept of '{keyword}', mysterious atmosphere, powerful visual storytelling"
+        for keywords, scene in scene_map:
+            if any(kw in topic.lower() for kw in keywords):
+                scene_desc = scene
+                break
+
+        thumbnail_prompt = f"""CRITICAL COMPOSITION RULE: YouTube thumbnail, 16:9 horizontal frame (1280x720px). ALL key subjects and focal points MUST be in the CENTER HORIZONTAL THIRD of the frame. Left and right 20% contains only atmospheric background.
+
+Cinematic YouTube thumbnail. Ultra-realistic, 8K detail, shot on RED cinema camera. {scene_desc}. Dramatic, eye-catching lighting — hard directional rim light with deep shadows. Saturated, high-contrast color grade. The image must look like a premium Hollywood movie poster or high-end documentary thumbnail.
+
+No text, no watermarks, no logos, no subtitles, no UI elements.
+Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain, flat colors, amateur, portrait orientation, square format, vertical frame, text overlay, watermark."""
+
+        # Save thumbnail prompt so Antigravity can generate the image
+        thumb_prompt_path = meta_path.parent / "thumbnail_prompt.txt"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        thumb_prompt_path.write_text(thumbnail_prompt, encoding="utf-8")
+
+        yield sse(f"✅ Thumbnail prompt saved → 5_deliverables/thumbnail_prompt.txt", "success")
+        time.sleep(0.2)
+
+        # ── SAVE METADATA JSON ───────────────────────────────────────────────
+        yield sse("💾 Saving youtube_meta.json…", "step")
+        time.sleep(0.1)
+
+        meta = {
+            "episode_id": eid,
+            "code": code,
+            "titles": titles,
+            "selected_title": titles[0],
+            "description": description,
+            "thumbnail_prompt": thumbnail_prompt,
+            "thumbnail_path": "",   # filled after Antigravity generates the image
+            "generated_at": datetime.datetime.now().isoformat(),
+            "audience": audience,
+            "language": lang,
+        }
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        # Mark phase done
+        mem_raw("pipeline", "set", eid, "youtube_meta", "done")
+        _broadcast_refresh({"action": "phase", "episode_id": eid, "phase": "youtube_meta", "status": "done"})
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        _broadcast_log(eid, {"message": "✅ Phase 'youtube_meta' marked as DONE", "level": "success", "ts": ts})
+
+        yield sse("🎉 YouTube Metadata Pack complete! Check the YouTube Pack card below.", "success")
+        yield f"data: {json.dumps({'status': 'complete', 'meta': meta})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 
 def _get_sources(eid):
@@ -957,11 +1273,16 @@ def _auto_detect_phases(eid, ep):
         found = list(script_dir.glob("SCRIPT_*.md"))
         return any(f.stat().st_size > 100 for f in found)
 
+    def _ytmeta_exist():
+        meta = p / "5_deliverables" / "youtube_meta.json"
+        return meta.exists() and meta.stat().st_size > 10
+
     checks = {
         "setup":        lambda: (p / "README.md").exists(),
         "research":     _src_exist,
         "script":       _script_exist,
         "audio":        lambda: (p / "3_audio" / "podcast.mp3").exists(),
+        "youtube_meta": _ytmeta_exist,
         "transcribe":   lambda: (p / "3_audio" / "transcript.txt").exists(),
         "visuals":      _vis_exist,
         "deliverables": _del_exist,

@@ -110,7 +110,7 @@ podpipeline/
 │   ├── skills/
 │   │   ├── memory/         ← SQLite DB + 30 writing profiles
 │   │   ├── notebooklm/     ← Audio generation skill
-│   │   ├── german-scifi-podcast/
+│   │   ├── dynamic-podcast-director/
 │   │   ├── audio-listener/ ← Whisper transcription
 │   │   └── youtube-podcast-researcher/
 │   └── workflows/

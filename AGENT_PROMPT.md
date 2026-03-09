@@ -157,7 +157,7 @@ python scripts/mem.py session save <episode_id> research "notebooklm generate au
 
 ### PHASE 3 — script
 Read the skills:
-- `.agent/skills/german-scifi-podcast/SKILL.md` (covers all languages, not just German — use for structure, pacing, style)
+- `.agent/skills/dynamic-podcast-director/SKILL.md` (adapts dynamically to any language — use for structure, pacing, style)
 - `.agent/skills/memory/SKILL.md`
 
 ```bash
@@ -171,7 +171,7 @@ python scripts/mem.py profile context <lang_code> <audience_key>
 # LANG and AUDIENCE come from episode memory — never hardcode
 ```
 
-Write the script following ALL rules in `german-scifi-podcast/SKILL.md`:
+Write the script following ALL rules in `dynamic-podcast-director/SKILL.md`:
 - Full dialogue between two hosts — names and personas defined by the language profile
 - Cold open < 60 seconds
 - 3 acts with cliffhanger every 4 minutes
@@ -339,7 +339,7 @@ python scripts/update_phase.py <episode_id> <phase> done    # Update dashboard
 |---|---|
 | All | `.agent/skills/memory/SKILL.md` |
 | Research | `.agent/skills/youtube-podcast-researcher/SKILL.md` |
-| Script | `.agent/skills/german-scifi-podcast/SKILL.md` (all languages) |
+| Script | `.agent/skills/dynamic-podcast-director/SKILL.md` (all languages + audiences) |
 | Audio | `.agent/skills/notebooklm/SKILL.md` |
 | Transcribe | `.agent/skills/audio-listener/SKILL.md` |
 | Full workflow | `.agent/workflows/podcast-pipeline.md` |

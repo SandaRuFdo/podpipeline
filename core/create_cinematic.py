@@ -88,7 +88,7 @@ def main():
     import re
     cin_nb_id = None
     if isinstance(result, dict):
-        cin_nb_id = result.get("id")
+        cin_nb_id = result.get("notebook", {}).get("id") or result.get("id")
     elif isinstance(result, str):
         m = re.search(r'"id":\s*"([^"]+)"', result)
         if m: cin_nb_id = m.group(1)

@@ -28,7 +28,24 @@
         <div class="search-backdrop"></div>
     </div>
 
-    <!-- KEYBOARD SHORTCUTS PANEL -->
+    <!-- UPDATE OVERLAY -->
+    <div id="update-overlay" class="search-overlay hidden">
+        <div class="search-modal update-modal">
+            <div class="shortcuts-header" style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: white;">🚀 Update Available</h3>
+                <button onclick="closeUpdateModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer;">✕</button>
+            </div>
+            <div style="padding: 16px;">
+                <p style="margin-top: 0; margin-bottom: 12px; color: var(--text-muted);">The following changes have been made:</p>
+                <pre id="update-changes" style="background: var(--bg-tertiary); padding: 12px; border-radius: 6px; overflow-x: auto; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 13px; max-height: 400px; white-space: pre-wrap; margin: 0;"></pre>
+            </div>
+            <div style="padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn-ghost" onclick="closeUpdateModal()">Later</button>
+                <button class="btn-primary" onclick="performUpdate()" id="update-ok-btn">Download & Update</button>
+            </div>
+        </div>
+        <div class="search-backdrop" onclick="closeUpdateModal()"></div>
+    </div>
     <div id="shortcuts-panel" class="shortcuts-panel hidden">
         <div class="shortcuts-inner">
             <div class="shortcuts-header">
@@ -70,7 +87,10 @@
         </ul>
         <div class="sidebar-footer">
             <div class="server-status"><span class="status-dot"></span><span>Server Active</span></div>
-            <button class="shortcut-trigger" onclick="toggleShortcuts()" title="Keyboard shortcuts (?)">⌨️</button>
+            <div style="display: flex; gap: 4px;">
+                <button class="shortcut-trigger" onclick="checkUpdates(true)" title="Check Updates">🔄</button>
+                <button class="shortcut-trigger" onclick="toggleShortcuts()" title="Keyboard shortcuts (?)">⌨️</button>
+            </div>
         </div>
     </nav>
 

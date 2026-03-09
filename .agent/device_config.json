@@ -1,0 +1,8 @@
+{
+  "device": "cpu",
+  "compute_type": "int8",
+  "device_label": "CPU",
+  "gpu_name": "None",
+  "vram_gb": null,
+  "speedup": "1x"
+}

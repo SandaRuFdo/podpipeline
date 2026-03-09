@@ -80,7 +80,7 @@ Then read and follow:
 |------------|-----------------------------------------------------------|
 | All phases | .agent/skills/memory/SKILL.md                             |
 | Research   | .agent/skills/youtube-podcast-researcher/SKILL.md         |
-| Script     | .agent/skills/german-scifi-podcast/SKILL.md               |
+| Script     | .agent/skills/dynamic-podcast-director/SKILL.md               |
 | Audio      | .agent/skills/notebooklm/SKILL.md                         |
 | Transcribe | .agent/skills/audio-listener/SKILL.md                     |
 

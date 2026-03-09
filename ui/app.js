@@ -952,7 +952,45 @@ function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt
   await initLanguagePicker();
   await initAudiencePicker();
   navigate("dashboard");
+  // Check updates silently on boot
+  checkUpdates(false);
 })();
+
+// ── UPDATES ───────────────────────────────────────────────────────────────────
+
+async function checkUpdates(manual = false) {
+  if (manual) toast("⏳ Checking for updates...", "info");
+  const res = await api("/api/check_updates");
+
+  if (res && res.update_available) {
+    document.getElementById("update-changes").textContent = res.changes || "Improvements and bug fixes.";
+    document.getElementById("update-overlay").classList.remove("hidden");
+  } else if (manual) {
+    toast("✅ You are on the latest version.", "success");
+  }
+}
+
+window.closeUpdateModal = function () {
+  document.getElementById("update-overlay").classList.add("hidden");
+}
+
+window.performUpdate = async function () {
+  const btn = document.getElementById("update-ok-btn");
+  btn.innerText = "Downloading...";
+  btn.disabled = true;
+
+  const res = await api("/api/update", { method: "POST" });
+
+  btn.innerText = "Download & Update";
+  btn.disabled = false;
+
+  if (res && res.success) {
+    closeUpdateModal();
+    toast("🎉 Update successful! Please restart the backend server (python app.py) and refresh this page.", "success");
+  } else {
+    toast(`❌ Update failed: ${res?.error || 'Unknown error'}`, "error");
+  }
+}
 
 // ── LIVE DASHBOARD PUSH (SSE) ────────────────────────────────────────────────
 // Listens on /api/events — server sends 'dashboard-update' after every phase

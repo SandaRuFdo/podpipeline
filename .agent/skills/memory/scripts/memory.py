@@ -746,7 +746,7 @@ _CONTRACT = {
     "visuals":       {"order":6, "depends_on":["transcribe"],
                       "inputs":["3_audio/transcript.txt","5_deliverables/SLIDE_SOURCE.md"],
                       "outputs":["4_visuals"],
-                      "desc":"Generate 16:9 cinematic images in parallel batches"},
+                      "desc":"Generate 16:9 cinematic images strictly matching audio transcript timestamps"},
     "deliverables":  {"order":7, "depends_on":["visuals"],
                       "inputs":["4_visuals"],
                       "outputs":["5_deliverables/walkthrough.md"],

@@ -318,6 +318,251 @@ PROFILES = {
 }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# WRITING STYLE BUILDER — generates a full detailed production brief per profile
+# Mirrors the structure of the German Sci-Fi Podcast Director skill.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def build_writing_style(lang: str, audience: str, p: dict) -> str:
+    lang_label = p["lang_label"]
+    aud_label  = p["audience_label"]
+    tone       = p["tone"]
+    slang      = p.get("slang", "")
+    vocab      = p.get("vocab", "")
+    refs       = p.get("cultural_refs", "")
+    hooks      = p.get("hooks", "")
+    avoid      = p.get("avoid", "")
+
+    format_map = {
+        "finance_listeners": "debate (market controversy) or deep-dive (investment thesis)",
+        "millennials":        "deep-dive (personal stakes, narrative-first) or critique (pop-culture vs. reality)",
+        "tech_enthusiasts":   "deep-dive (mechanism-first) or debate (ethical tech dilemmas)",
+        "gen_z":              "brief (5-min flash) or deep-dive (high-energy, cliffhanger-heavy)",
+        "health_wellness":    "deep-dive (science → body impact) or brief (quick health insight)",
+        "scifi_curious":      "deep-dive (cinematic storytelling) or critique (sci-fi vs. real science)",
+    }
+    analogy_map = {
+        "finance_listeners": "investment returns, market cycles, portfolio risk, S-curve adoption",
+        "millennials":        "adulting struggles, Netflix plots, 90s/2000s nostalgia, career anxiety",
+        "tech_enthusiasts":   "distributed systems, Big-O complexity, API contracts, version control",
+        "gen_z":              "gaming mechanics, anime power systems, TikTok trends, Discord culture",
+        "health_wellness":    "body-as-system metaphors, workout recovery, sleep cycles, food labels",
+        "scifi_curious":      "movie scenes, game lore, multiverse theory, cinematic universe arcs",
+    }
+    host_map = {
+        "finance_listeners": "Host A is the data-driven analyst; Host B asks 'what does this mean for my portfolio?'",
+        "millennials":        "Host A tells the story with emotional depth; Host B keeps relating it to their generation's shared experiences.",
+        "tech_enthusiasts":   "Host A is the deep technical expert; Host B asks the right clarifying questions.",
+        "gen_z":              "Both hosts are loud, reactive best friends — interruptions, 'WAIT WHAT', and energy are non-negotiable.",
+        "health_wellness":    "Host A is the science communicator; Host B asks 'how do I actually apply this to my life?'",
+        "scifi_curious":      "Host A builds the cinematic story; Host B is the skeptic-turned-believer who says 'that can't be real... is it?'",
+    }
+    rec_fmt    = format_map.get(audience, "deep-dive")
+    ana_style  = analogy_map.get(audience, "everyday relatable metaphors")
+    host_dyn   = host_map.get(audience, "Two curious, engaged co-hosts riffing off each other naturally.")
+
+    return f"""# 🎙️ Production Brief — {lang_label} × {aud_label}
+
+## 🧠 Core Identity & Voice
+
+**Who You Are:**
+{tone}
+
+**Host Dynamic:**
+{host_dyn}
+
+**Tone Rules:**
+| ✅ DO | ❌ DON'T |
+|---|---|
+| Speak naturally in {lang_label} with the right register for {aud_label} | Sound like a translated AI script or Wikipedia article |
+| Use slang and references that fit this audience | Force references that feel out of place or generationally wrong |
+| Build tension, curiosity, and emotional connection | Be dry, detached, or robotic |
+| Use analogies from: {ana_style} | Skip analogies or leave concepts abstract |
+| Let hosts disagree, interrupt, and have genuine reactions | Read facts monotonously |
+
+---
+
+## 🏗️ Episode Architecture (15–25 min)
+
+```
+1. COLD OPEN (30–60 sec)
+   → Hook: {hooks[:200]}
+   → NEVER start with 'Welcome' or 'Hello everyone' — drop straight into action.
+
+2. THEME INTRO (1–2 min)
+   → Reveal the real topic behind the hook.
+   → Bridge the dramatic hook to fact: 'This sounds wild — but the science is REAL.'
+
+3. DEEP DIVE — Act 1: The Setup (4–6 min)
+   → Explain the core concept using {ana_style} analogies.
+   → Use the 'Imagine you are...' technique.
+
+4. DEEP DIVE — Act 2: The Twist (4–6 min)
+   → Introduce a paradox or shocking counter-intuitive fact.
+   → Host dialogue: disagreement, 'wait, WHAT?' moments.
+   → Plant an OPEN LOOP here — tease something closed later.
+
+5. DEEP DIVE — Act 3: The Revelation (3–5 min)
+   → Connect everything. Close all open loops.
+   → Real-world implications for {aud_label}: 'This is happening NOW.'
+   → Reference: {refs[:150]}
+
+6. OUTRO & HOOK (1–2 min)
+   → Thought-provoking closing question.
+   → Cliffhanger tease for next episode.
+```
+
+### Recommended Formats
+Best fit for {aud_label}: `{rec_fmt}`
+
+| Format | Best For | Flag |
+|---|---|---|
+| **Deep Dive** | Core episodes — one big topic | `--format deep-dive` |
+| **The Debate** | Ethical dilemmas, controversial angles | `--format debate` |
+| **The Critique** | X vs. real science, debunking | `--format critique` |
+| **The Brief** | Quick 5-min insight flash | `--format brief` |
+
+---
+
+## 🎯 Engagement Tactics for {aud_label}
+
+**Hooks:** {hooks}
+
+**Analogy Style:** Every major concept MUST map to: {ana_style}
+
+**Cultural References:** {refs}
+
+**Vocabulary Rules:** {vocab}
+
+**Slang Palette (use naturally, do not force all):** {slang}
+
+---
+
+## 🧬 QUALITY: Making It Sound Human
+
+### The Anti-AI Playbook
+
+**1. Sentence Burstiness**
+```
+❌ AI-LIKE: "This is fascinating. It has many implications. Scientists studied it."
+✅ HUMAN: "Okay — so. This thing. I read this three times because I thought it was wrong.
+           It's not. And that should terrify you. Or excite you. Probably both."
+```
+Rules: mix short punchy fragments with long flowing sentences. Use dashes for dramatic pauses.
+
+**2. Micro-Emotions (plant at least 3 per episode)**
+- Genuine reactions: "I actually didn't expect this when I was researching."
+- Honest uncertainty: "I don't know if this is exciting or terrifying — maybe both."
+- Humor: "Spoiler: the universe doesn't have a customer support line."
+
+**3. Conversational Imperfections**
+- Self-corrections: "Actually — no, wait, let me say that differently."
+- Thinking out loud: "Hmm, how do I explain this..."
+- Real disagreement between hosts: "Hold on, I see it differently here."
+
+**4. Emotional Escalation Arc**
+```
+Hook  →  😱 Shock / Curiosity
+Setup →  🤔 Learning / Discovery
+Twist →  😨 Surprise / Disbelief
+Deep  →  🤯 Mind-blown
+Outro →  🌌 Wonder / Reflection
+```
+
+---
+
+## 🎭 QUALITY: Storytelling Techniques
+
+**Open Loops (plant 2–3 per episode)**
+Plant a tease early: "And here's where something completely unexpected happened — but let me
+explain the background first..." Then resolve it later: "Okay — NOW back to what I mentioned..."
+
+**Show, Don't Tell**
+```
+❌ TELLING: "The scientists were nervous."
+✅ SHOWING: "The lead researcher's hands were shaking when she called the editor.
+             She'd checked the numbers four times. They were correct."
+```
+
+**The 'Wait, WHAT?' Technique (plant 3+ per episode)**
+```
+Host A explains something calmly...
+Host B: "Wait. Wait. You're telling me that..."
+Host A: "Yep."
+Host B: "That is INSANE."
+```
+
+**Micro-Stories:** Every big concept needs a 30-second concrete story before the explanation.
+
+---
+
+## 🌍 Cultural Adaptation for {lang_label} × {aud_label}
+
+**Golden Rule: ADAPT, do not translate.**
+
+**Localization Checklist:**
+- [ ] Pronouns/formality correct for {aud_label} in {lang_label}
+- [ ] Pop-culture references are locally known equivalents
+- [ ] Humor style matches {lang_label} cultural register
+- [ ] No American-only references without local equivalent context
+
+**AVOID at all costs:** {avoid}
+
+---
+
+## 🔧 Mega-Prompt Template for NotebookLM
+
+```
+CONTEXT: Premium podcast episode for [{aud_label}] in [{lang_label}].
+STYLE: {tone[:120]}...
+HOSTS: {host_dyn}
+Do NOT sound like an audiobook or Wikipedia. Include interruptions, filler, self-corrections.
+
+CULTURAL RULES:
+- References: {refs[:200]}
+- Slang: {slang[:100]}
+- AVOID: {avoid[:100]}
+
+STRUCTURE:
+1. Dramatic Hook (30 sec)
+2. 'Why You Should Care' Intro (2 min)
+3. Deep Dive with Twist — use {ana_style} analogies (10 min)
+4. Outro with cliffhanger (2 min)
+
+Deliver audio that sounds 100% natively produced by local creators for {aud_label}.
+```
+
+---
+
+## ✅ Master Quality Checklist
+
+### Script Quality
+- [ ] Cold open has NO generic greeting — drops straight into action
+- [ ] Sentence burstiness achieved (varied lengths throughout)
+- [ ] At least 3 personal asides / micro-emotions
+- [ ] At least 3 'Wait, WHAT?' moments
+- [ ] At least 2 open loops planted and closed
+- [ ] Every major concept has a {ana_style} analogy
+- [ ] Cliffhanger ending teasing next episode
+
+### Human Feel
+- [ ] Sounds like: {host_dyn}
+- [ ] Contains self-corrections and thinking-out-loud moments
+- [ ] Humor does not feel scripted or forced
+- [ ] Passes 'read aloud' test — sounds natural when spoken
+
+### Cultural Adaptation
+- [ ] Written natively in {lang_label} — NOT translated from English
+- [ ] References used: {refs[:80]}
+- [ ] NONE of the avoid items present: {avoid[:80]}
+
+### Technical
+- [ ] NotebookLM language set to `{lang}`
+- [ ] Script is the SINGLE source in the audio notebook
+- [ ] `--retry 3` on all generate commands
+- [ ] `--length long` for standard episodes""".strip()
+
+
 def main():
     force = "--force" in sys.argv
 
@@ -366,11 +611,13 @@ def main():
             skipped += 1
             continue
 
+        ws = build_writing_style(lang, audience, profile)
+
         if existing and force:
             conn.execute("""
                 UPDATE skill_profiles
                 SET lang_label=?, audience_label=?, tone=?, vocabulary=?, slang_phrases=?,
-                    cultural_refs=?, hook_patterns=?, taboos=?, updated_at=CURRENT_TIMESTAMP
+                    cultural_refs=?, writing_style=?, hook_patterns=?, taboos=?, updated_at=CURRENT_TIMESTAMP
                 WHERE lang_code=? AND audience_key=?
             """, (
                 profile["lang_label"], profile["audience_label"],
@@ -378,6 +625,7 @@ def main():
                 profile.get("vocab", ""),
                 profile.get("slang", ""),
                 profile.get("cultural_refs", ""),
+                ws,
                 profile.get("hooks", ""),
                 profile.get("avoid", ""),
                 lang, audience
@@ -387,8 +635,8 @@ def main():
             conn.execute("""
                 INSERT INTO skill_profiles
                 (lang_code, audience_key, lang_label, audience_label, tone,
-                 vocabulary, slang_phrases, cultural_refs, hook_patterns, taboos)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                 vocabulary, slang_phrases, cultural_refs, writing_style, hook_patterns, taboos)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 lang, audience,
                 profile["lang_label"], profile["audience_label"],
@@ -396,6 +644,7 @@ def main():
                 profile.get("vocab", ""),
                 profile.get("slang", ""),
                 profile.get("cultural_refs", ""),
+                ws,
                 profile.get("hooks", ""),
                 profile.get("avoid", ""),
             ))

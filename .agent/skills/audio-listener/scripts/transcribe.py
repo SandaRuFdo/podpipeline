@@ -20,10 +20,10 @@ import sys
 import os
 from pathlib import Path
 
-# Fix Windows console encoding
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
+
 
 # Read model choice saved by start.py (falls back to "small" if not set)
 _config = Path(__file__).parent.parent.parent.parent.parent / ".agent" / "whisper_model.txt"
@@ -108,6 +108,29 @@ def transcribe(audio_path, model_size=DEFAULT_MODEL, language=None, word_timesta
         sys.exit(1)
 
     print(f"[transcribe] Language: {info.language} ({info.language_probability:.0%}) | Duration: {fmt_short(info.duration)}", file=sys.stderr)
+    
+    # Try to auto-save audio duration back to DB
+    try:
+        abs_path = os.path.abspath(audio_path).replace("\\", "/")
+        if "/episodes/S" in abs_path:
+            import re
+            m = re.search(r'/episodes/S(\d+)E(\d+)', abs_path)
+            if m:
+                s, e = int(m.group(1)), int(m.group(2))
+                mem_path = Path(__file__).parent.parent.parent.parent.parent / ".agent" / "skills" / "memory" / "scripts" / "memory.py"
+                import subprocess
+                # memory.py episode_update expects eid. Need to look up eid by season/episode?
+                # Actually memory.py has direct access or we can just send sqlite command.
+                db_path = Path(__file__).parent.parent.parent.parent.parent / ".agent" / "skills" / "memory" / "podcast_memory.db"
+                import sqlite3
+                conn = sqlite3.connect(str(db_path))
+                conn.execute("UPDATE episodes SET audio_dur=? WHERE season=? AND episode=?", (info.duration, s, e))
+                conn.commit()
+                conn.close()
+                print(f"[transcribe] Saved duration {fmt_short(info.duration)} to DB for S{s:02d}E{e:02d}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[transcribe] Could not save duration to DB: {exc}", file=sys.stderr)
+
     print(f"[transcribe] Processing segments...", file=sys.stderr)
 
     segments = []

@@ -105,7 +105,7 @@ podpipeline/
 │   │   │       └── skill_researcher.py  # AI audience research engine
 │   │   ├── notebooklm/
 │   │   │   └── SKILL.md             # NotebookLM API skill
-│   │   ├── german-scifi-podcast/
+│   │   ├── dynamic-podcast-director/
 │   │   │   └── SKILL.md             # Podcast director skill
 │   │   ├── audio-listener/
 │   │   │   └── SKILL.md             # Audio transcription (faster-whisper)
