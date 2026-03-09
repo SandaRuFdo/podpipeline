@@ -57,8 +57,11 @@ run(["ffmpeg", "-version"], "ffmpeg in PATH", check_str="ffmpeg version")
 # 4. yt-dlp
 run(["yt-dlp", "--version"], "yt-dlp installed")
 
-# 5. notebooklm CLI
+# 5. notebooklm CLI installed
 run(["notebooklm", "--help"], "notebooklm-py CLI installed")
+
+# 5b. notebooklm authenticated
+run(["notebooklm", "status"], "NotebookLM authenticated (Google account)", check_str="Authenticated")
 
 # 6. Memory DB
 run([sys.executable, "scripts/mem.py", "stats"], "Memory DB working", check_str="Episodes")

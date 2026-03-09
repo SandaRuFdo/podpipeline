@@ -63,14 +63,30 @@ Open a second terminal and run:
 notebooklm login
 ```
 
-A browser window will open. Sign in with the Google account that has NotebookLM access.
+This should open your browser for Google sign-in. Sign in with the Google account that has NotebookLM access.
 
-Confirm it works:
+After signing in, press ENTER in the terminal to save the session.
+
+### ⚠️ If the browser does NOT open automatically:
+
+**Option A — Copy auth from another PC that's already logged in:**
 ```bash
-notebooklm list
+# On the OLD machine — copy this file:
+# C:\Users\<username>\.notebooklm\storage_state.json
+
+# On the NEW machine — paste it here:
+# C:\Users\<username>\.notebooklm\storage_state.json
+# (create the .notebooklm folder if it doesn't exist)
 ```
 
-If `notebooklm list` returns without error, authentication is done.
+**Option B — Use the URL printed in the terminal:**
+When the browser doesn't auto-open, `notebooklm login` usually prints a URL. Copy it and paste it manually into your browser.
+
+**Verify authentication worked:**
+```bash
+notebooklm status
+```
+This must say `Authenticated as: your@email.com`. If it says "not authenticated" — repeat the login steps.
 
 ## Step 5 — (Optional) GPU acceleration
 
@@ -90,17 +106,18 @@ Run the automated smoke test. It checks all 10 system requirements and reports P
 python scripts/smoke_test.py
 ```
 
-This runs 10 checks automatically:
+This runs 11 checks automatically:
 1. Python 3.10+
 2. Core deps (flask, faster-whisper)
 3. ffmpeg in PATH
 4. yt-dlp installed
 5. notebooklm-py CLI installed
-6. Memory DB working
-7. Characters seeded (NOVA + MAX)
-8. Visual style 'tech' seeded
-9. `.agent/device_config.json` exists
-10. `.agent/whisper_model.txt` exists
+6. **NotebookLM authenticated (Google account)** ← catches missing login
+7. Memory DB working
+8. Characters seeded (NOVA + MAX)
+9. Visual style 'tech' seeded
+10. `.agent/device_config.json` exists
+11. `.agent/whisper_model.txt` exists
 
 Expected output:
 ```

@@ -56,12 +56,26 @@ In a new terminal (keep `start.py` running in the first one):
 notebooklm login
 ```
 
-This opens your browser for Google sign-in. Sign in with the Google account that has NotebookLM access. You only need to do this once — the session is saved.
+This opens your browser for Google sign-in. Sign in and then press ENTER in the terminal to save the session.
 
-Confirm it's working:
+**Verify it worked:**
 ```bash
-notebooklm list
+notebooklm status
 ```
+Must say `Authenticated as: your@email.com`.
+
+### ⚠️ If the browser doesn't open automatically
+
+**Option A — Copy auth from your other PC (easiest):**
+```
+OLD PC:  C:\Users\<name>\.notebooklm\storage_state.json
+NEW PC:  C:\Users\<name>\.notebooklm\storage_state.json
+```
+Copy that file over (USB, cloud, etc.) — done.
+
+**Option B — Paste the URL manually:**
+If browser doesn't open, the terminal usually prints a URL. Copy it into your browser manually.
+
 
 ### Step 4 — Open the dashboard
 
