@@ -64,6 +64,38 @@ Once defined, you internalize this persona:
 
 ---
 
+## 🔒 PERMANENT NOTEBOOK SOURCE RULES
+
+> These rules apply to **every episode** produced by this skill, without exception.  
+> They are global and do not change between episodes, languages, or audiences.
+
+### 🎙️ RULE 1 — Audio Notebook: SCRIPT ONLY
+
+When creating the NotebookLM notebook for **audio/podcast generation** (Phase 4):
+
+- ✅ Add **one file only**: `SCRIPT_<LANG>.md` (the custom-written target-language script)
+- ❌ Do NOT add YouTube transcripts, Wikipedia pages, blog articles, or any research doc
+- After adding, run `notebooklm source list --json` and confirm **exactly 1 source** before generating
+
+> **Reason:** The script already contains the perfect tone, Gen Z voice, slang, and narrative arc.  
+> Additional sources dilute these qualities and produce generic, off-brand audio.
+
+### 🎬 RULE 2 — Cinematic Notebook: ALL English Research Sources
+
+When creating the NotebookLM notebook for **cinematic video generation** (Phase 8):
+
+- ✅ Add **every English source** collected during Phase 2 research:
+  - All YouTube SRT/TXT transcript files from `1_research/sources/`
+  - All Wikipedia URLs referenced during research
+  - All blog articles, official docs, and web sources used
+- ❌ Do NOT add the podcast script (wrong language and wrong purpose)
+- ⛔ Minimum: **3 sources** before generating. More sources = richer cinematic output.
+
+> **Reason:** The cinematic notebook is a factual English visual companion.  
+> More diverse sources give the AI richer material for an accurate, interesting video.
+
+---
+
 ## 📝 Full Episode Production Workflow
 
 ### Step 1: Initialize the Profile & Notebook

@@ -285,11 +285,30 @@ Run the full pipeline from start to finish for this episode. Do not stop until a
 4. **IMPORTANT**: Use `python scripts/log_phase.py {eid} "Message" [info|success|error|step]` to push human-readable Live Logs to the user's browser terminal. Do this *frequently* so the user sees what you are doing (e.g. "Drafting script...", "Found 3 sources").
 5. Do NOT stop until deliverables phase is done and walkthrough.md exists.
 
+## ⏱️ PHASE 4.5 — YouTube Metadata Pack (Run IN PARALLEL during audio gen wait)
+
+> While `notebooklm artifact wait` is running in Phase 4, do these steps — zero extra time cost.
+
+**Step 4.5.1 — Generate titles, description & thumbnail prompt:**
+```bash
+# Call the API — it streams progress and auto-saves youtube_meta.json + thumbnail_prompt.txt
+curl -s -X POST http://localhost:5000/api/episodes/{eid}/generate-youtube-meta > /dev/null
+python scripts/log_phase.py {eid} "📋 YouTube metadata pack generated" success
+```
+
+**Step 4.5.2 — Generate the thumbnail image:**
+1. Read prompt file: `<ep_path>/5_deliverables/thumbnail_prompt.txt`
+2. Call `generate_image(prompt=<file content>)` → save to `<ep_path>/5_deliverables/thumbnail.png`
+3. Update thumbnail path via API:
+   `POST http://localhost:5000/api/episodes/{eid}/youtube-meta` — body: `{{"thumbnail_path": "<path>"}}`
+4. `python scripts/log_phase.py {eid} "🖼️ Thumbnail generated" success`
+
 ## Working Directory
 `episodes/S{int(season):02d}/E{int(episode):02d}_*/`
 
 Start now. Run phase: **{resume_phase}**
 """
+
 
     return jsonify({"prompt": prompt, "episode_id": eid, "resume_phase": resume_phase})
 
@@ -430,7 +449,34 @@ def open_folder(eid):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/episodes/<int:eid>/thumbnail")
+def serve_thumbnail(eid):
+    """Serve the episode thumbnail PNG file."""
+    from flask import send_file
+    ep = mem("episode", "get", eid)
+    if not isinstance(ep, dict):
+        return jsonify({"error": "not found"}), 404
+    meta_path = _youtube_meta_path(ep)
+    if not meta_path or not meta_path.exists():
+        return jsonify({"error": "No YouTube metadata found"}), 404
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        thumb_path = meta.get("thumbnail_path", "")
+        if not thumb_path:
+            # Try default location
+            thumb_path = str(meta_path.parent / "thumbnail.png")
+        p = Path(thumb_path)
+        if not p.is_absolute():
+            p = BASE / thumb_path
+        if not p.exists():
+            return jsonify({"error": "Thumbnail not generated yet"}), 404
+        return send_file(str(p), mimetype="image/png")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── UPDATES ───────────────────────────────────────────────────────────────────
+
 
 @app.route("/api/check_updates", methods=["GET"])
 def check_updates_api():
@@ -1083,24 +1129,79 @@ def generate_youtube_meta(eid):
         time.sleep(0.2)
 
         # ── DESCRIPTION GENERATION ───────────────────────────────────────────
-        yield sse("📝 Building YouTube description…", "step")
+        yield sse("📝 Building SEO-optimized YouTube description…", "step")
         time.sleep(0.3)
 
         today = datetime.datetime.now().strftime("%B %Y")
         src_credit = "\n".join(f"  • {t}" for t in src_titles[:5]) if src_titles else "  • Original research"
 
-        # Niche hashtags from audience + topic
+        # ── Trending keyword research (topic-aware) ───────────────────────────
         topic_words = [w.strip().lower() for w in topic.replace("-", " ").split() if len(w) > 3][:4]
+        topic_slug  = topic.replace(' ', '').replace('-', '')[:20]
         topic_tags  = " ".join(f"#{w}" for w in topic_words)
         niche_tags  = " ".join(f"#{n.strip().replace('-','').replace(' ','')}" for n in aud_niches.split(",")[:4]) if aud_niches else ""
         lang_tag    = f"#{lang_name.lower().replace(' ','')}"
         aud_tag     = f"#{aud_label.lower().replace(' ','').replace('&','and')}"
 
-        description = f"""🎙️ {code} — {title_de}
+        # ── Audience-matched hooks (first 2-3 lines = search preview) ────────
+        hook_map = {
+            "gen_z": (
+                f"Wait — {topic} just broke the internet, and nobody's talking about what actually happened. 🤯\n"
+                f"We dug past the headlines, the algorithms, and the noise — and what we found is wild."
+            ),
+            "millennials": (
+                f"Everything you were taught about {topic} is missing the most important part.\n"
+                f"This episode unpacks the full story — the evidence, the timeline, and what it actually means for you."
+            ),
+            "finance_listeners": (
+                f"The {topic} story has a financial angle that almost nobody is covering right now.\n"
+                f"In this episode, we break down the data, the risk, and what smart investors are actually watching."
+            ),
+            "tech_enthusiasts": (
+                f"{topic}: the technical reality is way more interesting — and more consequential — than the hype.\n"
+                f"We go deep on the science, the engineering, and what the data actually says."
+            ),
+            "health_wellness": (
+                f"New research on {topic} is changing what scientists thought they knew about the human body.\n"
+                f"This episode breaks it all down — what's real, what's overhyped, and what you should actually do."
+            ),
+        }
+        hook_text = hook_map.get(audience, (
+            f"{topic} — the full story, unfiltered.\n"
+            f"In {today}, we dig into the evidence, the theories, and the questions that don't have easy answers."
+        ))
 
-Is everything we know about {topic} wrong? In this episode, we go deep into the evidence, the cover-ups, and the unanswered questions that mainstream media refuses to touch. Buckle up — this one will change how you see the world.
+        # ── Audience-matched body tone ─────────────────────────────────────────
+        body_map = {
+            "gen_z": (
+                f"No fluff. No filler. Just the facts about {topic} that actually matter — served fast.\n\n"
+                f"We covered: the origin, the controversy, the latest developments, and the takes you won't hear anywhere else."
+            ),
+            "millennials": (
+                f"We grew up being told one version of this story. This episode challenges that — with sources, context, and nuance.\n\n"
+                f"Whether you're new to {topic} or deep in the rabbit hole, this is the breakdown you've been waiting for."
+            ),
+            "finance_listeners": (
+                f"This episode is data-driven and source-backed. We don't do hype — we do analysis.\n\n"
+                f"Topics covered: market implications of {topic}, historical parallels, risk frameworks, and the signals worth watching."
+            ),
+            "tech_enthusiasts": (
+                f"This is a no-nonsense technical deep dive. We cite our sources, show our reasoning, and go where the evidence leads.\n\n"
+                f"Covered this episode: the mechanics of {topic}, current research, open questions, and practical implications."
+            ),
+            "health_wellness": (
+                f"We talk to the science — not the supplements industry. Every claim is backed by research we actually link.\n\n"
+                f"This episode covers: what {topic} is, the latest clinical evidence, myths vs. facts, and actionable takeaways."
+            ),
+        }
+        body_text = body_map.get(audience, (
+            f"Every episode we take a topic that deserves more than surface-level coverage and go all the way in.\n\n"
+            f"This episode: {topic}. We trace the evidence, challenge the mainstream narrative, and let you decide."
+        ))
 
-{'📌 This episode was created for: ' + aud_label + ' — ' + aud_desc[:120] + '...' if aud_desc else ''}
+        description = f"""{hook_text}
+
+{body_text}
 
 ━━━━━━━━━━━━━━━━━━━━━━━
 ⏱️ TIMESTAMPS
@@ -1114,34 +1215,37 @@ Is everything we know about {topic} wrong? In this episode, we go deep into the 
 {src_credit}
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-🔔 NEVER MISS AN EPISODE
+🔔 SUBSCRIBE FOR MORE
 ━━━━━━━━━━━━━━━━━━━━━━━
-Subscribe + hit the bell to be notified the moment a new episode drops.
-Drop your thoughts in the comments — what do YOU think is really going on?
+New episodes every week — hit Subscribe and the 🔔 so you never miss a drop.
+Leave your take in the comments — what do YOU think is really going on?
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-#podcast #{topic.replace(' ', '').replace('-', '')[:20]} {topic_tags} {niche_tags} {lang_tag} {aud_tag} #science #mystery #deepdive"""
+#podcast #{topic_slug} {topic_tags} {niche_tags} {lang_tag} {aud_tag} #deepdive #truecrime #science"""
 
-        yield sse("✅ Description built", "success")
+        yield sse("✅ SEO description built (hook + keyword body + CTA + hashtags)", "success")
         time.sleep(0.2)
 
         # ── THUMBNAIL PROMPT ─────────────────────────────────────────────────
-        yield sse("🖼️ Writing thumbnail image prompt…", "step")
+        yield sse("🖼️ Writing viral thumbnail prompt (topic-branded, audience-matched)…", "step")
         time.sleep(0.2)
 
         # Build a research-aware thumbnail prompt
         keyword = topic.replace('"', '').strip()
-        # Map topic keywords to dramatic scene types
+
+        # ── Topic → cinematic background scene ───────────────────────────────
         scene_map = [
-            (["alien", "reptile", "ufo", "extraterrestrial"], "alien ship descending through storm clouds over a modern government building at night, dramatic green tractor beam, cinematic"),
+            (["alien", "reptile", "ufo", "extraterrestrial"], "alien ship descending through storm clouds over a government building at night, dramatic green tractor beam, cinematic, AREA 51 logo subtly visible on building fence"),
+            (["antigravity", "anti-gravity", "gravity", "levitation", "wormhole", "zero-g"], "dramatic anti-gravity research lab with floating objects and glowing energy fields, NASA and Google logos visible in background, deep blue and electric white, cinematic"),
+            (["google", "alphabet"], "massive Google logo glowing in a dark server room, dramatic blue and red neon light, cinematic documentary style"),
             (["biden", "trump", "president", "politician"], "imposing government building with dramatic storm clouds, dark political atmosphere, heavy shadows, chiaroscuro lighting"),
             (["quantum", "physics", "relativity", "particle"], "glowing quantum particle collision in a dark laboratory, light trails, deep blue and electric white, futuristic"),
-            (["space", "nasa", "galaxy", "cosmos", "star", "planet"], "breathtaking deep space vista, nebula in purple and gold, a lone astronaut silhouetted against a massive alien planet"),
-            (["dark matter", "black hole", "gravity", "wormhole"], "swirling black hole with gravitational lensing, deep purple and electric blue accents, stars distorted around the event horizon"),
-            (["ai", "artificial intelligence", "robot", "machine"], "hyper-realistic humanoid robot with glowing circuit eyes, chrome surface, dramatic industrial backdrop"),
+            (["space", "nasa", "galaxy", "cosmos", "star", "planet"], "breathtaking deep space vista, nebula in purple and gold, a lone astronaut silhouetted against a massive alien planet, NASA logo on suit"),
+            (["dark matter", "black hole", "wormhole"], "swirling black hole with gravitational lensing, deep purple and electric blue accents, stars distorted around the event horizon"),
+            (["ai", "artificial intelligence", "robot", "machine"], "hyper-realistic humanoid robot with glowing circuit eyes, chrome surface, dramatic industrial backdrop, OpenAI and Google logos visible"),
             (["conspiracy", "secret", "government", "classified"], "shadowy figure in front of illuminated classified documents, single desk lamp, deep shadows, film noir atmosphere"),
             (["health", "longevity", "biohack", "conscious"], "human DNA double helix glowing in medical blue, cells transforming, clean scientific lab setting"),
-            (["crypto", "finance", "stock", "invest"], "dramatic golden bull on Wall Street at dusk, glowing stock chart overlaid, cinematic financial power"),
+            (["crypto", "bitcoin", "finance", "stock", "invest"], "dramatic golden bull on Wall Street at dusk, glowing stock chart overlaid, Bitcoin logo in background, cinematic financial power"),
         ]
 
         scene_desc = f"dramatic cinematic scene representing the concept of '{keyword}', mysterious atmosphere, powerful visual storytelling"
@@ -1150,19 +1254,47 @@ Drop your thoughts in the comments — what do YOU think is really going on?
                 scene_desc = scene
                 break
 
-        thumbnail_prompt = f"""CRITICAL COMPOSITION RULE: YouTube thumbnail, 16:9 horizontal frame (1280x720px). ALL key subjects and focal points MUST be in the CENTER HORIZONTAL THIRD of the frame. Left and right 20% contains only atmospheric background.
+        # ── Audience-matched text hook style ─────────────────────────────────
+        # Short punchy hook that lives as bold text overlay on the thumbnail
+        text_hook_map = {
+            "gen_z":            f"THEY HID THIS",
+            "millennials":      f"THE REAL STORY",
+            "finance_listeners": f"FOLLOW THE MONEY",
+            "tech_enthusiasts": f"THE TRUTH",
+            "health_wellness":  f"SCIENTISTS SHOCKED",
+        }
+        text_hook = text_hook_map.get(audience, "THEY LIED TO US")
 
-Cinematic YouTube thumbnail. Ultra-realistic, 8K detail, shot on RED cinema camera. {scene_desc}. Dramatic, eye-catching lighting — hard directional rim light with deep shadows. Saturated, high-contrast color grade. The image must look like a premium Hollywood movie poster or high-end documentary thumbnail.
+        # ── Font + color style per audience ──────────────────────────────────
+        style_map = {
+            "gen_z":            "bold white Impact-style font, neon yellow glow outline, grunge texture, TikTok-energy",
+            "millennials":      "bold white condensed font, red drop shadow, high-contrast Vox/Vox-media documentary style",
+            "finance_listeners": "bold gold serif font, sharp black shadow, Bloomberg terminal aesthetic",
+            "tech_enthusiasts": "bold white monospace font, electric blue glow, dark tech aesthetic, MIT/WIRED magazine style",
+            "health_wellness":  "bold clean white sans-serif, soft glow, bright medical green accent, trust-building clinical style",
+        }
+        text_style = style_map.get(audience, "bold white Impact font, black drop shadow, high contrast, viral YouTube style")
 
-No text, no watermarks, no logos, no subtitles, no UI elements.
-Negative: cartoon, anime, illustration, painting, sketch, blurry, noise, grain, flat colors, amateur, portrait orientation, square format, vertical frame, text overlay, watermark."""
+        thumbnail_prompt = f"""YouTube podcast thumbnail, 16:9 horizontal frame (1280x720px). ALL key subjects MUST be in the CENTER HORIZONTAL THIRD. Left and right 20% contains atmospheric background only.
+
+CINEMATIC BACKGROUND: {scene_desc}. Ultra-realistic, 8K detail. Dramatic hard directional rim light with deep shadows. Saturated, high-contrast Hollywood movie poster color grade.
+
+TEXT OVERLAY (REQUIRED): Large bold text reading \"{text_hook}\" in {text_style}. Text is placed in the upper-center third of the frame, maximum 3 words, clearly legible against the background, eye-catching and scroll-stopping.
+
+TOPIC BRANDING: Include any logos, symbols, or visual branding elements that are directly relevant to '{keyword}' and YouTube-compliant. Brand elements should be recognizable but integrated naturally into the scene.
+
+AUDIENCE FEEL: This thumbnail targets {aud_label}. The overall mood, color, and energy must instantly appeal to this audience on first glance while scrolling YouTube.
+
+VIRAL STYLE REFERENCE: Study viral podcast thumbnails from channels like JRE, Lex Fridman, MrBeast, Colin & Samir for composition, contrast, and impact. This must compete with the best thumbnails in the niche.
+
+Negative: blurry, noise, grain, flat colors, amateur, portrait orientation, square format. Do NOT add generic stock-photo style text boxes or banner overlays."""
 
         # Save thumbnail prompt so Antigravity can generate the image
         thumb_prompt_path = meta_path.parent / "thumbnail_prompt.txt"
         meta_path.parent.mkdir(parents=True, exist_ok=True)
         thumb_prompt_path.write_text(thumbnail_prompt, encoding="utf-8")
 
-        yield sse(f"✅ Thumbnail prompt saved → 5_deliverables/thumbnail_prompt.txt", "success")
+        yield sse(f"✅ Viral thumbnail prompt saved → 5_deliverables/thumbnail_prompt.txt", "success")
         time.sleep(0.2)
 
         # ── SAVE METADATA JSON ───────────────────────────────────────────────

@@ -2,13 +2,14 @@
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────────
 
-const PHASES = ["setup", "research", "script", "audio", "transcribe", "visuals", "deliverables", "cinematic_setup"];
-const PHASE_ICONS = { setup: "📁", research: "🔍", script: "✍️", audio: "🎙️", transcribe: "🎧", visuals: "🖼️", deliverables: "📦", cinematic_setup: "🎬" };
+const PHASES = ["setup", "research", "script", "audio", "youtube_meta", "transcribe", "visuals", "deliverables", "cinematic_setup"];
+const PHASE_ICONS = { setup: "📁", research: "🔍", script: "✍️", audio: "🎙️", youtube_meta: "▶️", transcribe: "🎧", visuals: "🖼️", deliverables: "📦", cinematic_setup: "🎬" };
 const PHASE_DESC = {
   setup: "Create episode folder + register in memory",
   research: "Find YouTube sources, add to NotebookLM",
   script: "Write script in target language + English translation",
   audio: "Generate podcast via NotebookLM, download MP3",
+  youtube_meta: "Generate thumbnail, 5 viral titles + video description (parallel during audio wait)",
   transcribe: "Transcribe audio with real timestamps",
   visuals: "Generate 16:9 cinematic images for each segment",
   deliverables: "Build CapCut walkthrough + register in memory",
@@ -474,7 +475,7 @@ async function loadEpisodeDetail(eid) {
         <div class="detail-title">${ep.title_de || "—"}</div>
         <div class="detail-topic">${ep.topic || ""}</div>
       </div>
-      <span class="ep-status ${ep.status || "planned"}" style="font-size:13px;padding:5px 14px">${ep.status || "planned"}</span>
+      <span class="ep-status ${_deriveStatus(ep.status, phases)}" style="font-size:13px;padding:5px 14px">${_deriveStatus(ep.status, phases)}</span>
     </div>
 
     <div class="detail-grid">
@@ -483,8 +484,8 @@ async function loadEpisodeDetail(eid) {
         <div class="card">
           <div class="card-header"><h2>🔄 Pipeline Status</h2></div>
           <div class="pipeline-track" id="pipeline-track-${ep.id}">
-            ${phases.map(p => phaseRow(ep.id, p)).join("")}
-            ${phases.length && phases.every(p => p.status === "done" || p.status === "skipped") ? `
+            ${phases.map(p => phaseRow(ep.id, p, phases)).join("")}
+            ${phases.length && phases.every(p => _safePhaseStatus(p, phases) === "done" || _safePhaseStatus(p, phases) === "skipped") ? `
               <div class="phase-row done" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(5,150,105,0.08));border:1px solid rgba(16,185,129,0.3);margin-top:6px;cursor:pointer" onclick="openDeliverables(${ep.id})">
                 <span class="phase-icon" style="font-size:22px">📂</span>
                 <div style="flex:1">
@@ -565,12 +566,237 @@ async function loadEpisodeDetail(eid) {
           <div class="card-header"><h2>🧠 AI Context</h2></div>
           <div class="context-box">${escHtml(data.context_preview || "No context yet.")}</div>
         </div>
+
+        <!-- YOUTUBE PACK CARD -->
+        <div class="card" id="yt-pack-card-${ep.id}" style="border:1px solid rgba(255,0,0,0.2);background:linear-gradient(135deg,rgba(255,0,0,0.04),rgba(20,20,20,0.95))">
+          <div class="card-header" style="border-bottom:1px solid rgba(255,0,0,0.15)">
+            <h2 style="display:flex;align-items:center;gap:8px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.75 15.5V8.5l6.5 3.5-6.5 3.5z"/></svg>
+              YouTube Pack
+            </h2>
+            <button id="yt-gen-btn-${ep.id}" onclick="generateYoutubeMeta(${ep.id})" style="
+              padding:6px 14px;border-radius:8px;border:none;
+              background:linear-gradient(135deg,#FF0000,#cc0000);
+              color:#fff;font-size:12px;font-weight:600;cursor:pointer;
+              display:flex;align-items:center;gap:6px;
+            ">
+              <span id="yt-gen-btn-icon-${ep.id}">⚡</span> Generate Pack
+            </button>
+          </div>
+
+          <!-- Progress bar (hidden until generating) -->
+          <div id="yt-progress-${ep.id}" style="display:none;padding:10px 16px 0">
+            <div style="font-size:11px;color:#8b949e;font-family:var(--mono);margin-bottom:6px" id="yt-progress-msg-${ep.id}">Starting…</div>
+            <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
+              <div id="yt-progress-bar-${ep.id}" style="height:100%;width:0%;background:linear-gradient(90deg,#FF0000,#ff6b6b);border-radius:2px;transition:width 0.4s ease"></div>
+            </div>
+          </div>
+
+          <div id="yt-pack-body-${ep.id}" style="padding:14px 16px;display:none">
+
+            <!-- Thumbnail Preview -->
+            <div id="yt-thumb-wrap-${ep.id}" style="display:none;margin-bottom:16px">
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Thumbnail Preview</div>
+              <img id="yt-thumb-img-${ep.id}" src="" alt="Thumbnail" style="
+                width:100%;border-radius:8px;border:1px solid var(--border);
+                aspect-ratio:16/9;object-fit:cover;
+              ">
+            </div>
+
+            <!-- Titles -->
+            <div style="margin-bottom:16px">
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center">
+                <span>🏷️ Title Options — click to copy</span>
+                <span id="yt-title-copied-${ep.id}" style="color:#3fb950;font-size:11px;opacity:0;transition:opacity 0.3s">✓ Copied!</span>
+              </div>
+              <div id="yt-titles-${ep.id}" style="display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+
+            <!-- Description -->
+            <div>
+              <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;display:flex;justify-content:space-between;align-items:center">
+                <span>📝 Video Description</span>
+                <button onclick="copyYtDesc(${ep.id})" style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--text-dim);font-size:11px;cursor:pointer">📋 Copy</button>
+              </div>
+              <textarea id="yt-desc-${ep.id}" rows="8" readonly style="
+                width:100%;box-sizing:border-box;resize:vertical;
+                background:rgba(0,0,0,0.3);border:1px solid var(--border);
+                border-radius:8px;padding:10px 12px;color:var(--text-mid);
+                font-family:var(--mono);font-size:11px;line-height:1.6;
+              "></textarea>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div id="yt-empty-${ep.id}" style="padding:20px 16px;text-align:center;color:var(--text-dim);font-size:13px">
+            No YouTube Pack yet — click <strong>Generate Pack</strong> to create titles, description &amp; thumbnail prompt.
+          </div>
+        </div>
+
       </div>
     </div>`;
 
   // Start listening to live logs
   subscribeToEpisodeLogs(eid);
+
+  // Load existing YouTube metadata if it exists
+  loadYoutubeMeta(eid);
 }
+
+// ── CLIPBOARD HELPER ─────────────────────────────────────────────────────────
+
+function _fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); } catch (_) { }
+  ta.remove();
+}
+
+// ── YOUTUBE PACK HELPERS ───────────────────────────────────────────────────────
+
+function _renderYoutubeMeta(eid, meta) {
+  if (!meta || !meta.titles) return;
+
+  const body = document.getElementById(`yt-pack-body-${eid}`);
+  const empty = document.getElementById(`yt-empty-${eid}`);
+  const titles = document.getElementById(`yt-titles-${eid}`);
+  const desc = document.getElementById(`yt-desc-${eid}`);
+  const prog = document.getElementById(`yt-progress-${eid}`);
+  const thumb = document.getElementById(`yt-thumb-wrap-${eid}`);
+  const thumbImg = document.getElementById(`yt-thumb-img-${eid}`);
+
+  if (empty) empty.style.display = 'none';
+  if (prog) prog.style.display = 'none';
+  if (body) body.style.display = 'block';
+
+  // Render titles — each is a clickable chip
+  if (titles && meta.titles) {
+    titles.innerHTML = meta.titles.map((t, i) => `
+      <div onclick="window._copyYtTitle(${eid}, this, ${JSON.stringify(t)})" style="
+        padding:10px 14px;border-radius:8px;cursor:pointer;
+        background:rgba(255,255,255,0.04);border:1px solid var(--border);
+        font-size:13px;color:var(--text);line-height:1.4;
+        transition:background 0.15s,border-color 0.15s;
+        display:flex;align-items:flex-start;gap:10px;
+      " onmouseover="this.style.background='rgba(255,0,0,0.08)';this.style.borderColor='rgba(255,0,0,0.3)'"
+         onmouseout="this.style.background='rgba(255,255,255,0.04)';this.style.borderColor='var(--border)'">
+        <span style="color:#FF0000;font-size:11px;font-weight:700;flex-shrink:0;padding-top:1px">${i + 1}</span>
+        <span>${escHtml(t)}</span>
+      </div>`).join('');
+  }
+
+  // Render description
+  if (desc && meta.description) desc.value = meta.description;
+
+  // Render thumbnail if path is saved
+  if (thumb && thumbImg && meta.thumbnail_path) {
+    thumbImg.src = `/api/episodes/${eid}/thumbnail`;
+    thumb.style.display = 'block';
+  }
+}
+
+window._copyYtTitle = function (eid, el, title) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(title).catch(() => _fallbackCopy(title));
+  } else {
+    _fallbackCopy(title);
+  }
+  // Flash indicator
+  const ind = document.getElementById(`yt-title-copied-${eid}`);
+  if (ind) { ind.style.opacity = '1'; setTimeout(() => ind.style.opacity = '0', 1800); }
+  toast('Title copied! 📋', 'success');
+};
+
+async function loadYoutubeMeta(eid) {
+  const data = await api(`/api/episodes/${eid}/youtube-meta`);
+  if (data && data.titles) _renderYoutubeMeta(eid, data);
+}
+
+window.generateYoutubeMeta = async function (eid) {
+  const btn = document.getElementById(`yt-gen-btn-${eid}`);
+  const btnIcon = document.getElementById(`yt-gen-btn-icon-${eid}`);
+  const progDiv = document.getElementById(`yt-progress-${eid}`);
+  const progMsg = document.getElementById(`yt-progress-msg-${eid}`);
+  const progBar = document.getElementById(`yt-progress-bar-${eid}`);
+  const empty = document.getElementById(`yt-empty-${eid}`);
+
+  if (btn) { btn.disabled = true; }
+  if (btnIcon) btnIcon.textContent = '⏳';
+  if (progDiv) progDiv.style.display = 'block';
+  if (empty) empty.style.display = 'none';
+  if (progMsg) progMsg.textContent = 'Connecting…';
+  if (progBar) progBar.style.width = '5%';
+
+  let step = 0;
+  const steps = ['titles', 'description', 'thumbnail', 'saving'];
+  const stepProgress = { 'titles': 30, 'description': 55, 'thumbnail': 80, 'saving': 95 };
+
+  try {
+    const resp = await fetch(`/api/episodes/${eid}/generate-youtube-meta`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+
+      for (const part of parts) {
+        const dataLine = part.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+        let payload;
+        try { payload = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+
+        if (payload.log) {
+          if (progMsg) progMsg.textContent = payload.log.replace(/^[🎬✍️📝🖼️💾✅⏳]+ /, '');
+          // Auto-advance progress bar based on keywords
+          const loglc = payload.log.toLowerCase();
+          if (loglc.includes('title') && progBar) progBar.style.width = '30%';
+          if (loglc.includes('description') && progBar) progBar.style.width = '55%';
+          if (loglc.includes('thumbnail') && progBar) progBar.style.width = '80%';
+          if (loglc.includes('saving') && progBar) progBar.style.width = '92%';
+        }
+
+        if (payload.status === 'complete' && payload.meta) {
+          if (progBar) progBar.style.width = '100%';
+          setTimeout(() => {
+            if (progDiv) progDiv.style.display = 'none';
+            _renderYoutubeMeta(eid, payload.meta);
+            toast('🎉 YouTube Pack ready!', 'success');
+          }, 400);
+        }
+      }
+    }
+  } catch (e) {
+    toast('Generation failed: ' + e.message, 'error');
+    if (progMsg) progMsg.textContent = '❌ Failed — see terminal for details';
+  } finally {
+    if (btn) { btn.disabled = false; }
+    if (btnIcon) btnIcon.textContent = '⚡';
+  }
+};
+
+window.copyYtDesc = function (eid) {
+  const ta = document.getElementById(`yt-desc-${eid}`);
+  if (!ta || !ta.value) { toast('No description yet', 'error'); return; }
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(ta.value).catch(() => _fallbackCopy(ta.value));
+  } else {
+    _fallbackCopy(ta.value);
+  }
+  toast('Description copied! 📋', 'success');
+};
 
 function subscribeToEpisodeLogs(eid) {
   if (currentLogSource) { currentLogSource.close(); }
@@ -586,6 +812,13 @@ function subscribeToEpisodeLogs(eid) {
       if (ev.data === ":heartbeat") return;
       const log = JSON.parse(ev.data);
       if (!log.message) return;
+
+      // BUG #6 — suppress 🎉 PIPELINE COMPLETE if any phase in the track is still "running"
+      if (log.message.includes('PIPELINE COMPLETE') || log.message.includes('🎉')) {
+        const track = document.querySelectorAll('.phase-row');
+        const anyRunning = Array.from(track).some(row => row.classList.contains('running'));
+        if (anyRunning) return; // suppress — pipeline is not truly complete yet
+      }
 
       const div = document.createElement("div");
       div.style.marginBottom = "2px";
@@ -615,15 +848,35 @@ function subscribeToEpisodeLogs(eid) {
   };
 }
 
-function phaseRow(eid, p) {
+// BUG #6: remap "running" → "pending" for phases that were never actually started
+// (i.e. pipeline completed its main flow before reaching them)
+function _safePhaseStatus(p, allPhases) {
+  if (p.status !== 'running') return p.status;
+  // If deliverables is done → the pipeline's main flow is complete.
+  // Any phase still "running" at that point was never actually started.
+  const deliverablesDone = allPhases.some(x => x.phase === 'deliverables' && x.status === 'done');
+  if (deliverablesDone) return 'pending';
+  return p.status;
+}
+
+// BUG #2: derive visual episode status from phases
+function _deriveStatus(epStatus, phases) {
+  if (!phases || !phases.length) return epStatus || 'planned';
+  const allResolved = phases.every(p => p.status === 'done' || p.status === 'skipped');
+  if (allResolved) return 'complete';
+  return epStatus || 'planned';
+}
+
+function phaseRow(eid, p, allPhases) {
+  const safeStatus = _safePhaseStatus(p, allPhases || []);
   const icon = PHASE_ICONS[p.phase] || "⚙️";
-  return `<div class="phase-row ${p.status}">
+  return `<div class="phase-row ${safeStatus}">
     <span class="phase-icon">${icon}</span>
     <div style="flex:1">
       <div class="phase-name">${p.phase.replace(/_/g, " ")}</div>
       <div class="phase-desc">${PHASE_DESC[p.phase] || ""}</div>
     </div>
-    <span class="phase-badge ${p.status}">${p.status}</span>
+    <span class="phase-badge ${safeStatus}">${safeStatus}</span>
     <div class="phase-actions">
       <button class="phase-btn" onclick="markPhase(event,${eid},'${p.phase}','done')">✓ Done</button>
       <button class="phase-btn danger" onclick="markPhase(event,${eid},'${p.phase}','failed')">✗ Fail</button>

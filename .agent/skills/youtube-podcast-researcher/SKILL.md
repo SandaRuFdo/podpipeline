@@ -11,6 +11,45 @@ You are the **ultimate content scout** — you find the hottest, most viral Engl
 
 ---
 
+## 🛑 Phase 0: Source Requirements Gate (GLOBAL RULE — ALL EPISODES)
+
+> **This rule is permanent and applies to every single episode without exception.**
+
+Before the research phase is considered complete and the pipeline may advance to script writing, the following **minimum source requirements MUST be met**:
+
+| Source Category | Minimum Required | Notes |
+|---|---|---|
+| 🎥 **YouTube video transcripts** | **2** (ideally 3) | SRT downloaded + converted to `.txt`. Videos with NO subtitles don't count. |
+| 📖 **Wikipedia / official docs** | **1** (ideally 2) | Full page text fetched and saved to `1_research/sources/` |
+| 💬 **Blog / community discussion** | **1** (ideally 2) | Reddit thread, GitHub discussion, or reputable blog post |
+| 📋 **Official release notes / paper** | 0 (add if it exists) | arxiv, company blog, GitHub release notes |
+| **TOTAL** | **≥ 5** | Across ≥ 3 different categories |
+
+### Gate Enforcement Rules
+
+1. **Count before advancing** — run `python scripts/mem.py source list <episode_id>` and count rows.
+2. **At least 1 YouTube transcript is non-negotiable** — even for non-video topics, the YouTube search must be attempted and at least 1 video with subtitles found.
+3. **"I couldn't find enough" is not acceptable** — broaden search queries, try alternate spellings, related subtopics, or adjacent concepts until 5 sources are collected.
+4. **All source text files must be saved** to `<ep_path>/1_research/sources/` before the gate passes.
+5. **Script phase (Phase 3) MUST NOT start** until the gate checklist is manually verified and passes.
+
+### Gate Checklist (fill in before proceeding)
+
+```
+SOURCE COUNT GATE
+─────────────────────────────────────────────
+YouTube transcripts:  ___ / 2 minimum
+Wikipedia/Docs:       ___ / 1 minimum  
+Blog/Community:       ___ / 1 minimum
+TOTAL:                ___ / 5 minimum
+All .txt files saved: YES / NO
+All logged to memory: YES / NO
+─────────────────────────────────────────────
+GATE: [ ] PASS   [ ] FAIL — do not proceed if FAIL
+```
+
+---
+
 ## 🛠️ Prerequisites
 
 ### Install yt-dlp (one-time setup)
