@@ -148,7 +148,7 @@ python scripts/update_phase.py <episode_id> script done
 ### 4.1 Create a fresh notebook for audio generation
 
 ```bash
-notebooklm create "S01E02 - <Topic Title>" --json
+notebooklm create "S<SEASON>E<EP> - <Topic Title>" --json
 # → Save notebook ID
 notebooklm use <notebook_id>
 
@@ -156,11 +156,12 @@ notebooklm use <notebook_id>
 python scripts/mem.py episode update <episode_id> notebook_id <notebook_id>
 ```
 
-### 4.2 Add ONLY the German script as source
+### 4.2 Add ONLY the target-language script as source
 
 ```bash
 # This is the ONLY source — no English transcripts, no Wikipedia
-notebooklm source add "<ep_path>/2_script/SCRIPT_DE.md" --json
+# File is SCRIPT_<LANG>.md where LANG = episode output language code (DE, EN, ES, etc.)
+notebooklm source add "<ep_path>/2_script/SCRIPT_<LANG>.md" --json
 
 # Wait for source to be ready
 notebooklm source list --json   # Check "status": "ready"
@@ -317,7 +318,7 @@ python scripts/force_16x9.py "<ep_path>/4_visuals/"
 ```
 
 > Run this **ONCE after all slides are generated** — not after every image.
-> This ffmpeg scale+pad step is non-negotiable. Every image must be exactly 1920×1080 before CapCut.
+> This uses **crop-to-fill**: scale up to cover 1920×1080, then center-crop. No black bars.
 
 ```bash
 python scripts/mem.py log <episode_id> visuals "N slides generated in parallel batches + force_16x9 → 1920x1080"
@@ -403,17 +404,17 @@ python scripts/update_phase.py <episode_id> cinematic done
 ## FINAL OUTPUT STRUCTURE
 
 ```
-episodes/S01/E02_Dark_Matter/
+episodes/S<SEASON>/E<EP>_<SLUG>/
 ├── README.md
 ├── 1_research/sources/     ← YouTube SRT/TXT, Wikipedia exports
 ├── 2_script/
-│   ├── SCRIPT_DE.md        ← German script (Nova + Max)
-│   └── SCRIPT_EN.md        ← English translation for review
+│   ├── SCRIPT_<LANG>.md    ← Script in target language (e.g. SCRIPT_DE.md, SCRIPT_EN.md)
+│   └── SCRIPT_EN.md        ← English translation for review (always present)
 ├── 3_audio/
-│   ├── podcast.mp3         ← Generated German podcast
+│   ├── podcast.mp3         ← Generated podcast in <LANG>
 │   └── transcript.txt      ← Timestamped segments
 ├── 4_visuals/
-│   ├── slide01_*.png       ← 16:9 cinematic images
+│   ├── slide01_*.png       ← 16:9 cinematic images (1920×1080, crop-to-fill)
 │   └── ...
 └── 5_deliverables/
     ├── SLIDE_SOURCE.md     ← Timestamp → visual mapping

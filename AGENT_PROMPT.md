@@ -52,7 +52,7 @@ Ask the user for these details:
 3. Target Audience (Gen Z / Millennials / Tech Enthusiasts / Finance Listeners / Health & Wellness)
 4. Season number (default: 1)
 5. Episode number (e.g. 1, 2, 3...)
-6. German title (or generate one from the topic)
+6. Title in the output language (or generate one from the topic)
 7. Folder slug — no spaces (e.g. Dark_Matter)
 ```
 
@@ -120,7 +120,7 @@ python scripts/update_phase.py <episode_id> <phase> done
 ---
 
 ### PHASE 1 — setup
-Read the skill: `.agent/skills/german-scifi-podcast/SKILL.md`
+Read the skill: `.agent/skills/memory/SKILL.md`
 
 ```bash
 python scripts/mem.py contract verify <episode_id> setup
@@ -157,7 +157,7 @@ python scripts/mem.py session save <episode_id> research "notebooklm generate au
 
 ### PHASE 3 — script
 Read the skills:
-- `.agent/skills/german-scifi-podcast/SKILL.md`
+- `.agent/skills/german-scifi-podcast/SKILL.md` (covers all languages, not just German — use for structure, pacing, style)
 - `.agent/skills/memory/SKILL.md`
 
 ```bash
@@ -168,20 +168,20 @@ python scripts/mem.py smart-context <episode_id>
 
 # Load writing profile for this episode's language × audience
 python scripts/mem.py profile context <lang_code> <audience_key>
-# e.g. python scripts/mem.py profile context de gen_z
+# LANG and AUDIENCE come from episode memory — never hardcode
 ```
 
 Write the script following ALL rules in `german-scifi-podcast/SKILL.md`:
-- Full dialogue between Nova (storyteller) and Max (reactor)
+- Full dialogue between two hosts — names and personas defined by the language profile
 - Cold open < 60 seconds
 - 3 acts with cliffhanger every 4 minutes
 - Target: 20-25 minutes (≈ 3000-4000 words)
-- Save as: `<ep_path>/2_script/SCRIPT_DE.md` (target language)
+- Save as: `<ep_path>/2_script/SCRIPT_<LANG>.md` (use uppercase LANG, e.g. SCRIPT_DE.md, SCRIPT_EN.md)
 - Also write English version: `<ep_path>/2_script/SCRIPT_EN.md`
 - Create slide source: `<ep_path>/5_deliverables/SLIDE_SOURCE.md`
 
 ```bash
-python scripts/mem.py output set <episode_id> script script_de "<ep_path>/2_script/SCRIPT_DE.md" --verify
+python scripts/mem.py output set <episode_id> script script_de "<ep_path>/2_script/SCRIPT_<LANG>.md" --verify
 python scripts/mem.py output set <episode_id> script script_en "<ep_path>/2_script/SCRIPT_EN.md" --verify
 python scripts/update_phase.py <episode_id> script done
 python scripts/mem.py session save <episode_id> script "notebooklm generate audio --notebook <id>" "Start PHASE 4 audio generation"
@@ -279,7 +279,7 @@ python scripts/mem.py session save <episode_id> deliverables "Create cinematic n
 ```bash
 python scripts/mem.py contract verify <episode_id> cinematic_setup
 notebooklm create --title "Cinematic - <topic>"
-# Add ENGLISH sources only (NOT the German script)
+# Add ENGLISH sources only (NOT the target-language script — this notebook is for English video)
 notebooklm source add --url "<english_source_url>"
 python scripts/mem.py episode update <episode_id> cinematic_notebook_id "<cinematic_notebook_id>"
 python scripts/mem.py output set <episode_id> cinematic_setup cinematic_notebook_id "<cinematic_notebook_id>"
@@ -301,7 +301,8 @@ python scripts/mem.py profile evolve <episode_id>
 python scripts/mem.py session clear
 
 # Commit episode to git (optional)
-git add -A && git commit -m "ep: S01E0X <title> — complete"
+git add -A
+git commit -m "ep: S<SEASON>E<EP> <title> (<lang>) — complete"
 ```
 
 ---
@@ -338,7 +339,7 @@ python scripts/update_phase.py <episode_id> <phase> done    # Update dashboard
 |---|---|
 | All | `.agent/skills/memory/SKILL.md` |
 | Research | `.agent/skills/youtube-podcast-researcher/SKILL.md` |
-| Script | `.agent/skills/german-scifi-podcast/SKILL.md` |
+| Script | `.agent/skills/german-scifi-podcast/SKILL.md` (all languages) |
 | Audio | `.agent/skills/notebooklm/SKILL.md` |
 | Transcribe | `.agent/skills/audio-listener/SKILL.md` |
 | Full workflow | `.agent/workflows/podcast-pipeline.md` |
