@@ -82,6 +82,12 @@ async function initLanguagePicker() {
   dd.innerHTML = `<input type="text" placeholder="Search…" id="lang-search-input" oninput="filterLangs(this.value)" />`;
   renderLangOptions();
 
+  // Auto-select the first language so hidden inputs are always populated
+  if (_languages.length > 0) {
+    const first = _languages[0];
+    selectLang(first.code, first.name);
+  }
+
   document.getElementById("lang-selected").addEventListener("click", () => {
     dd.classList.toggle("hidden");
     const inp = dd.querySelector("input");
@@ -127,8 +133,8 @@ async function initAudiencePicker() {
   const grid = document.getElementById("audience-card-grid");
   if (!grid) return;
 
-  grid.innerHTML = data.map(a =>
-    `<div class="audience-card${a.key === 'finance_listeners' ? ' selected' : ''}" 
+  grid.innerHTML = data.map((a, i) =>
+    `<div class="audience-card${i === 0 ? ' selected' : ''}" 
         id="aud-card-${a.key}"
         onclick="selectAudience('${a.key}')">
       <div class="audience-emoji">${a.emoji}</div>
@@ -136,7 +142,8 @@ async function initAudiencePicker() {
     </div>`
   ).join("");
 
-  selectAudience("finance_listeners");
+  // Auto-select first audience from API — not hardcoded
+  if (data.length > 0) selectAudience(data[0].key);
 }
 
 window.selectAudience = function (key) {
@@ -286,7 +293,7 @@ async function loadDashboard() {
   const langSummary = document.getElementById("lang-summary");
   if (langSummary && _episodes.length) {
     const counts = {};
-    _episodes.forEach(e => { const k = `${e.output_language || "de"}:${e.language_name || "German"}`; counts[k] = (counts[k] || 0) + 1; });
+    _episodes.forEach(e => { const k = `${e.output_language || ""}:${e.language_name || ""}`; if (e.output_language) counts[k] = (counts[k] || 0) + 1; });
     langSummary.innerHTML = Object.entries(counts).map(([k, c]) => {
       const [code, name] = k.split(":");
       const lang = _languages.find(l => l.code === code) || {};
@@ -311,11 +318,12 @@ function renderDashboardEpisodes() {
 function epRow(ep) {
   const code = `S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`;
   const st = ep.status || "planned";
-  const lang = _languages.find(l => l.code === (ep.output_language || "de")) || {};
+  const langCode = ep.output_language || "";
+  const lang = _languages.find(l => l.code === langCode) || {};
   return `<div class="ep-row" data-eid="${ep.id}">
     <span class="ep-code">${code}</span>
     <span class="ep-title">${ep.title_de || "—"}</span>
-    <span class="ep-lang-pill">${flagImg(lang ? lang.code : ep.output_language || 'en')}</span>
+    <span class="ep-lang-pill">${langCode ? flagImg(langCode) : ""}</span>
     <span class="ep-status ${st}">${st}</span>
   </div>`;
 }
@@ -416,14 +424,9 @@ document.getElementById("new-episode-form").addEventListener("submit", async e =
         termBadge.className = "terminal-badge done"; termBadge.textContent = "Done";
         toast("Episode created! 🎉", "success");
         e.target.reset();
-        // Reset to highest-CPM defaults
-        document.getElementById("lang-selected").textContent = "🇬🇧 English";
-        document.getElementById("lang-code-input").value = "en";
-        document.getElementById("lang-name-input").value = "English";
-        document.getElementById("target-audience-input").value = "finance_listeners";
-        document.querySelectorAll(".audience-card").forEach(c => c.classList.remove("selected"));
-        const fc = document.getElementById("aud-card-finance_listeners");
-        if (fc) fc.classList.add("selected");
+        // Reset pickers to first available option (dynamic — not hardcoded)
+        if (_languages.length > 0) selectLang(_languages[0].code, _languages[0].name);
+        if (_audiences.length > 0) selectAudience(_audiences[0].key);
         document.getElementById("audience-tips-box")?.classList.add("hidden");
       } else {
         termBadge.className = "terminal-badge error"; termBadge.textContent = "Failed";

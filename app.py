@@ -179,13 +179,13 @@ def get_episode(eid):
 @app.route("/api/episodes", methods=["POST"])
 def create_episode():
     d = request.json
-    required = ["season","episode","slug","title_de","topic"]
-    if not all(k in d for k in required):
-        return jsonify({"error": "Missing: " + ", ".join(required)}), 400
+    required = ["season","episode","slug","title_de","topic","output_language","language_name","target_audience"]
+    if not all(k in d and d[k] for k in required):
+        return jsonify({"error": "Missing: " + ", ".join(k for k in required if not d.get(k))}), 400
 
-    lang_code = d.get("output_language") or "en"   # fallback English, NOT German
-    lang_name  = d.get("language_name") or "English"
-    audience   = d.get("target_audience", "scifi_curious")
+    lang_code = d["output_language"]
+    lang_name  = d["language_name"]
+    audience   = d["target_audience"]
     job_id = str(uuid.uuid4())
     q: queue.Queue = queue.Queue()
     _jobs[job_id] = q
