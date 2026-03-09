@@ -55,7 +55,7 @@ def fmt_srt(s):
 
 # ── TRANSCRIPTION ────────────────────────────────────────────────────────────
 
-def transcribe(audio_path, model_size="small", language=None, word_timestamps=False):
+def transcribe(audio_path, model_size=DEFAULT_MODEL, language=None, word_timestamps=False):
     """Transcribe audio and return (segments, info)."""
     try:
         from faster_whisper import WhisperModel
@@ -63,19 +63,31 @@ def transcribe(audio_path, model_size="small", language=None, word_timestamps=Fa
         print("ERROR: faster-whisper not installed. Run: pip install faster-whisper", file=sys.stderr)
         sys.exit(1)
 
-    # Auto-detect GPU; fall back to CPU int8
-    try:
-        import torch
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        compute = "float16" if device == "cuda" else "int8"
-    except ImportError:
-        device, compute = "cpu", "int8"
+    # Read device config saved by start.py; fall back to auto-detect
+    _cfg_path = Path(__file__).parent.parent.parent.parent.parent / ".agent" / "device_config.json"
+    if _cfg_path.exists():
+        try:
+            _cfg = json.load(open(_cfg_path))
+            device  = _cfg.get("device", "cpu")
+            compute = _cfg.get("compute_type", "int8")
+            print(f"[transcribe] Using device from setup config: {_cfg.get('device_label', device)}", file=sys.stderr)
+        except Exception:
+            device, compute = "cpu", "int8"
+    else:
+        # Auto-detect fallback (no start.py config found)
+        try:
+            import torch
+            device  = "cuda" if torch.cuda.is_available() else "cpu"
+            compute = "float16" if device == "cuda" else "int8"
+        except ImportError:
+            device, compute = "cpu", "int8"
 
     print(f"[transcribe] Model: {model_size} | Device: {device} | Compute: {compute}", file=sys.stderr)
     print(f"[transcribe] Loading model...", file=sys.stderr)
 
     try:
         model = WhisperModel(model_size, device=device, compute_type=compute)
+
     except Exception as e:
         print(f"ERROR loading model '{model_size}': {e}", file=sys.stderr)
         sys.exit(1)

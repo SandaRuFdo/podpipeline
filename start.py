@@ -252,6 +252,114 @@ def select_and_download_whisper_model():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# STEP 3.6 — GPU detection
+# ═════════════════════════════════════════════════════════════════════════════
+DEVICE_CONFIG = BASE / ".agent" / "device_config.json"
+
+def detect_gpu():
+    head("STEP 3.6 — GPU detection")
+
+    # If already detected, load and show cached result
+    if DEVICE_CONFIG.exists():
+        try:
+            cfg = json.loads(DEVICE_CONFIG.read_text())
+            ok(f"Cached device: {cfg.get('device_label', cfg.get('device'))} "
+               f"[{cfg.get('compute_type')}] -- skipping re-detection.")
+            dim("  Delete .agent/device_config.json to re-detect.")
+            return cfg
+        except Exception:
+            pass  # corrupt config — re-detect
+
+    device      = "cpu"
+    compute     = "int8"
+    device_label = "CPU (no GPU found)"
+    gpu_name    = None
+    vram_gb     = None
+    speedup     = "1x"
+
+    # ── 1. Try NVIDIA CUDA via torch ──────────────────────────────────────────
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_name    = torch.cuda.get_device_name(0)
+            vram_bytes  = torch.cuda.get_device_properties(0).total_memory
+            vram_gb     = round(vram_bytes / (1024**3), 1)
+            device      = "cuda"
+            compute     = "float16"
+            device_label = f"NVIDIA CUDA — {gpu_name} ({vram_gb} GB VRAM)"
+            speedup     = "5-10x"
+    except ImportError:
+        pass  # torch not installed — try other methods
+
+    # ── 2. Try AMD ROCm (Linux / torch-rocm) ─────────────────────────────────
+    if device == "cpu":
+        try:
+            import torch
+            if hasattr(torch, "version") and "rocm" in (torch.version.hip or ""):
+                device      = "cuda"   # ROCm uses the CUDA interface in torch
+                compute     = "float16"
+                device_label = "AMD ROCm GPU"
+                speedup     = "3-6x"
+        except Exception:
+            pass
+
+    # ── 3. Try AMD/Intel via DirectML on Windows ──────────────────────────────
+    if device == "cpu" and sys.platform == "win32":
+        try:
+            import onnxruntime as ort
+            providers = ort.get_available_providers()
+            if "DmlExecutionProvider" in providers:
+                device      = "dml"
+                compute     = "float16"
+                device_label = "AMD/Intel GPU via DirectML (ONNX Runtime)"
+                speedup     = "2-4x"
+        except ImportError:
+            pass
+
+    # ── 4. Try Apple Metal (MPS) ──────────────────────────────────────────────
+    if device == "cpu":
+        try:
+            import torch
+            if torch.backends.mps.is_available():
+                device      = "cpu"     # faster-whisper doesn't support MPS yet
+                compute     = "int8"    # stays on CPU but at least we know
+                device_label = "Apple Silicon (MPS available but Whisper uses CPU int8)"
+                speedup     = "1.5x"
+        except Exception:
+            pass
+
+    # ── Result ────────────────────────────────────────────────────────────────
+    if device in ("cuda", "dml"):
+        ok(f"GPU found: {device_label}")
+        ok(f"  Compute: {compute}  |  Estimated speed: {speedup} vs CPU")
+        if vram_gb:
+            dim(f"  VRAM: {vram_gb} GB")
+        info("Whisper transcription will use GPU automatically.")
+    else:
+        if device_label == "CPU (no GPU found)":
+            warn("No dedicated GPU detected. Using CPU (int8) for Whisper.")
+            warn("Transcription will work fine but may be slower.")
+            dim("  Tip: install torch with CUDA for 5-10x speed boost if you have an NVIDIA GPU.")
+        else:
+            ok(f"{device_label}")
+            info("Using CPU int8 — fast enough for most use cases.")
+
+    # Save config for use by transcribe.py and other scripts
+    cfg = {
+        "device":       device,
+        "compute_type": compute,
+        "device_label": device_label,
+        "gpu_name":     gpu_name,
+        "vram_gb":      vram_gb,
+        "speedup":      speedup,
+    }
+    DEVICE_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    DEVICE_CONFIG.write_text(json.dumps(cfg, indent=2))
+    ok(f"Device config saved to .agent/device_config.json")
+    return cfg
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # STEP 4 — Memory DB init
 # ═════════════════════════════════════════════════════════════════════════════
 def init_memory(reset: bool):
@@ -460,6 +568,7 @@ def main():
     check_ffmpeg()
     install_deps()
     select_and_download_whisper_model()
+    detect_gpu()
     init_memory(reset=args.reset_db)
     seed_profiles()
     check_notebooklm_auth()
