@@ -155,14 +155,42 @@ def get_audiences():
 
 @app.route("/api/episodes")
 def list_episodes():
-    """Direct SQLite — no subprocess, no regex, no 200-iteration loop."""
+    """Direct SQLite with dynamic status calculation from pipeline phases."""
     try:
         conn = _db()
-        rows = conn.execute(
-            "SELECT * FROM episodes ORDER BY season, episode"
-        ).fetchall()
+        # Join with pipeline to see if any phases are running/done for this episode
+        rows = conn.execute("""
+            SELECT e.*, 
+                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id) as total_phases,
+                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'done') as done_phases,
+                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'running') as running_phases,
+                   (SELECT COUNT(*) FROM pipeline p WHERE p.episode_id = e.id AND p.status = 'failed') as failed_phases
+            FROM episodes e 
+            ORDER BY e.season, e.episode
+        """).fetchall()
         conn.close()
-        return jsonify([dict(r) for r in rows])
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            # Dynamically calculate overall status
+            st = d.get("status", "planned")
+            if d["failed_phases"] > 0:
+                st = "error"
+            elif d["running_phases"] > 0:
+                st = "running"
+            elif d["total_phases"] > 0 and d["done_phases"] == len(PHASE_ORDER):
+                st = "complete"
+            elif d["done_phases"] > 0 or d["total_phases"] > 0:
+                st = "running"
+                
+            d["status"] = st
+            # Clean up temporary count columns
+            for k in ["total_phases", "done_phases", "running_phases", "failed_phases"]:
+                d.pop(k, None)
+            results.append(d)
+            
+        return jsonify(results)
     except Exception as e:
         return jsonify([])  # Return empty list on error
 
