@@ -18,7 +18,7 @@ const PALETTE = { "deep-blue": "#1e40af", "purple": "#7c3aed", "black": "#111", 
 
 // ── FLAG IMAGES ────────────────────────────────────────────────────────────────
 // Map lang codes to ISO 3166-1 alpha-2 for flagcdn.com (Windows has no native flag emoji)
-const LANG_TO_COUNTRY = { en: "gb", de: "de", fr: "fr", pt: "br", es: "es" };
+const LANG_TO_COUNTRY = { en: "us", de: "de", fr: "fr", pt: "br", es: "es" };
 function flagImg(langCode, size = 20) {
   const cc = LANG_TO_COUNTRY[langCode] || langCode;
   return `<img src="https://flagcdn.com/${size}x${Math.round(size * 0.75)}/${cc}.png"
