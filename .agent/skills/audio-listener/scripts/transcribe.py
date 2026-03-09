@@ -25,6 +25,10 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
 
+# Read model choice saved by start.py (falls back to "small" if not set)
+_config = Path(__file__).parent.parent.parent.parent.parent / ".agent" / "whisper_model.txt"
+DEFAULT_MODEL = _config.read_text().strip() if _config.exists() else "small"
+
 
 # ── TIME FORMATTERS ──────────────────────────────────────────────────────────
 
@@ -157,7 +161,8 @@ def out_json(segs, info):
 def main():
     p = argparse.ArgumentParser(description="Transcribe audio with timestamps")
     p.add_argument("audio_file")
-    p.add_argument("--model",    default="small", choices=["tiny","small","medium","large-v3"])
+    p.add_argument("--model",    default=DEFAULT_MODEL, choices=["tiny","small","medium","large-v3"],
+                   help=f"Whisper model (default: {DEFAULT_MODEL} — set during setup)")
     p.add_argument("--language", default=None)
     p.add_argument("--output",   default=None)
     p.add_argument("--format",   default="segments", choices=["txt","srt","json","segments"])

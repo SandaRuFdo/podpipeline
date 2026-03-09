@@ -10,10 +10,12 @@ This script will:
   1. Check Python 3.10+
   2. Check / install ffmpeg (warn if missing)
   3. Install all pip dependencies
+  3.5 Select + pre-download Whisper transcription model
   4. Initialize the memory database
   5. Seed all 30 writing profiles
   6. Run a self-test (API health checks)
-  7. Launch the app at http://localhost:5000
+  7. Check NotebookLM auth
+  8. Launch the app at http://localhost:5000
 
 Flags:
   --no-launch      Install + test only, don't launch the server
@@ -59,6 +61,7 @@ def head(msg): print(f"\n{B}{'-'*56}\n  {msg}\n{'-'*56}{R}")
 def dim(msg):  print(f"{DIM}      {msg}{R}")
 
 BASE = Path(__file__).parent
+WHISPER_CONFIG = BASE / ".agent" / "whisper_model.txt"  # persists user's model choice
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
@@ -184,6 +187,68 @@ def install_deps():
     if missing:
         fail(f"Could not import: {missing}")
         sys.exit(1)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 3.5 — Whisper model selection + download
+# ═════════════════════════════════════════════════════════════════════════════
+WHISPER_MODELS = {
+    "1": {"name": "tiny",     "size": "~75 MB",  "speed": "fastest",  "accuracy": "basic",       "best_for": "Quick drafts, testing"},
+    "2": {"name": "small",    "size": "~244 MB", "speed": "fast",     "accuracy": "good",        "best_for": "Default — best balance"},
+    "3": {"name": "medium",   "size": "~769 MB", "speed": "moderate", "accuracy": "better",      "best_for": "Non-English podcasts"},
+    "4": {"name": "large-v3", "size": "~1.5 GB", "speed": "slowest",  "accuracy": "best",        "best_for": "Final production quality"},
+}
+
+def select_and_download_whisper_model():
+    head("STEP 3.5 — Whisper transcription model")
+
+    # If already chosen, skip
+    if WHISPER_CONFIG.exists():
+        saved = WHISPER_CONFIG.read_text().strip()
+        ok(f"Whisper model already set: [{saved}] — skipping.")
+        dim("  Delete .agent/whisper_model.txt to re-select.")
+        return saved
+
+    # Show model table
+    print(f"\n{C}  Choose a Whisper model for audio transcription (Phase 5):{R}\n")
+    print(f"  {'#':<3} {'Model':<12} {'Size':<10} {'Speed':<10} {'Accuracy':<10} Best for")
+    print(f"  {'-'*70}")
+    for key, m in WHISPER_MODELS.items():
+        marker = f"{Y}[recommended]{R}" if m['name'] == 'small' else ""
+        print(f"  {key:<3} {m['name']:<12} {m['size']:<10} {m['speed']:<10} {m['accuracy']:<10} {m['best_for']} {marker}")
+    print()
+
+    while True:
+        try:
+            choice = input(f"{C}  Enter number [1-4] (default: 2 = small): {R}").strip()
+        except (EOFError, KeyboardInterrupt):
+            choice = "2"
+        if not choice:
+            choice = "2"
+        if choice in WHISPER_MODELS:
+            break
+        warn(f"  Invalid choice '{choice}'. Enter 1, 2, 3, or 4.")
+
+    model = WHISPER_MODELS[choice]
+    model_name = model["name"]
+    info(f"Selected: {model_name} ({model['size']})")
+
+    # Pre-download the model
+    info(f"Pre-downloading {model_name} model — this may take a minute...")
+    try:
+        from faster_whisper import WhisperModel
+        # Load the model (this triggers the download if not cached)
+        WhisperModel(model_name, device="cpu", compute_type="int8")
+        ok(f"Model [{model_name}] downloaded and ready ✓")
+    except Exception as e:
+        warn(f"Model pre-download failed: {e}")
+        warn("Whisper will auto-download on first use — that's fine.")
+
+    # Save choice
+    WHISPER_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    WHISPER_CONFIG.write_text(model_name)
+    ok(f"Model choice saved to .agent/whisper_model.txt")
+    return model_name
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -394,6 +459,7 @@ def main():
     check_python()
     check_ffmpeg()
     install_deps()
+    select_and_download_whisper_model()
     init_memory(reset=args.reset_db)
     seed_profiles()
     check_notebooklm_auth()
