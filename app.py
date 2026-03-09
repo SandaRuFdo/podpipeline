@@ -183,8 +183,8 @@ def create_episode():
     if not all(k in d for k in required):
         return jsonify({"error": "Missing: " + ", ".join(required)}), 400
 
-    lang_code = d.get("output_language", "de")
-    lang_name  = d.get("language_name", "German")
+    lang_code = d.get("output_language") or "en"   # fallback English, NOT German
+    lang_name  = d.get("language_name") or "English"
     audience   = d.get("target_audience", "scifi_curious")
     job_id = str(uuid.uuid4())
     q: queue.Queue = queue.Queue()
@@ -193,12 +193,11 @@ def create_episode():
     def run():
         cmd = [
             sys.executable, str(BASE / "core" / "new_episode.py"),
-
             "--season", str(d["season"]), "--episode", str(d["episode"]),
-            "--slug", d["slug"], "--title-de", d["title_de"],
+            "--slug", d["slug"], "--title", d["title_de"],
+            "--lang", lang_code, "--lang-name", lang_name,
             "--topic", d["topic"],
-            "--force",  # always overwrite from web UI
-
+            "--force",
         ]
         if d.get("title_en"): cmd += ["--title-en", d["title_en"]]
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

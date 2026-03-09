@@ -390,9 +390,9 @@ document.getElementById("new-episode-form").addEventListener("submit", async e =
     title_de: fd.get("title_de"),
     title_en: fd.get("title_en") || null,
     topic: fd.get("topic"),
-    output_language: fd.get("output_language") || "de",
-    language_name: fd.get("language_name") || "German",
-    target_audience: fd.get("target_audience") || "scifi_curious",
+    output_language: fd.get("output_language") || "en",   // fallback English, never German
+    language_name: fd.get("language_name") || "English",
+    target_audience: fd.get("target_audience") || "finance_listeners",
   };
 
   const res = await api("/api/episodes", { method: "POST", body: JSON.stringify(body) });
