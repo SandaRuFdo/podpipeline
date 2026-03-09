@@ -518,6 +518,203 @@ def run_self_test(port: int):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# STEP 6.5 — Browser UI test (Playwright)
+# ═════════════════════════════════════════════════════════════════════════════
+def run_browser_ui_test(port: int):
+    head("STEP 6.5 — Browser UI test")
+
+    # ── Ensure playwright is installed ────────────────────────────────────────
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        info("playwright not found — installing...")
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "playwright", "--quiet"],
+            capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            warn("Could not install playwright — skipping browser UI test.")
+            return
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            warn("playwright install succeeded but import failed — skipping.")
+            return
+
+    # ── Ensure Chromium browser is installed ──────────────────────────────────
+    info("Checking Chromium browser...")
+    result = subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium", "--quiet"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        warn(f"Chromium install failed — skipping browser UI test.")
+        warn(result.stderr[-300:] if result.stderr else "")
+        return
+    ok("Chromium ready ✓")
+
+    # ── Start the app in background ───────────────────────────────────────────
+    info("Starting app for browser tests...")
+    server_proc = subprocess.Popen(
+        [sys.executable, str(BASE / "app.py"), "--port", str(port)],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        cwd=str(BASE), encoding="utf-8"
+    )
+    base_url = f"http://localhost:{port}"
+
+    # Wait for server to be ready
+    for i in range(15):
+        time.sleep(1)
+        try:
+            urllib.request.urlopen(f"{base_url}/api/languages", timeout=2)
+            break
+        except Exception:
+            if i == 14:
+                warn("Server didn't start within 15s — skipping browser UI test.")
+                server_proc.terminate()
+                return
+    ok(f"Server ready at {base_url}")
+
+    # ── Define page checks ────────────────────────────────────────────────────
+    # Each entry: (page_name, nav_trigger, elements_to_check)
+    # nav_trigger = None means it's the default page (dashboard)
+    PAGE_CHECKS = [
+        {
+            "name":     "Dashboard",
+            "hash":     None,
+            "click":    "[data-page='dashboard']",
+            "wait_for": "#page-dashboard.active",
+            "checks": [
+                ("#stats-grid",     "Stats grid"),
+                ("#sv-eps",         "Episodes stat card"),
+                ("#sv-langs",       "Languages stat card"),
+                ("#recent-ep-list", "Recent episodes list"),
+                ("#suggest-box",    "Next topic suggestion"),
+            ],
+        },
+        {
+            "name":     "Episodes",
+            "click":    "[data-page='episodes']",
+            "wait_for": "#page-episodes.active",
+            "checks": [
+                ("#episodes-grid",      "Episodes grid"),
+                ("#ep-filter-lang",     "Language filter dropdown"),
+                ("#ep-filter-status",   "Status filter dropdown"),
+            ],
+        },
+        {
+            "name":     "New Episode Form",
+            "click":    "[data-page='new-episode']",
+            "wait_for": "#page-new-episode.active",
+            "checks": [
+                ("#new-episode-form",       "Episode creation form"),
+                ("input[name='season']",    "Season field"),
+                ("input[name='episode']",   "Episode number field"),
+                ("input[name='slug']",      "Folder slug field"),
+                ("#lang-selected",          "Language picker"),
+                ("#audience-card-grid",     "Audience selection grid"),
+                ("input[name='title_de']",  "Title field"),
+                ("input[name='topic']",     "Topic field"),
+                ("#create-btn",             "Create Episode button"),
+            ],
+        },
+        {
+            "name":     "Analytics",
+            "click":    "[data-page='analytics']",
+            "wait_for": "#page-analytics.active",
+            "checks": [
+                ("#analytics-stats",   "Project stats panel"),
+                ("#analytics-suggest", "Topic suggestion panel"),
+                ("#quality-form",      "Quality feedback form"),
+            ],
+        },
+        {
+            "name":     "Memory",
+            "click":    "[data-page='memory']",
+            "wait_for": "#page-memory.active",
+            "checks": [
+                ("#characters-list", "Characters panel"),
+                ("#styles-list",     "Visual styles panel"),
+                ("#topics-list",     "Covered topics panel"),
+            ],
+        },
+    ]
+
+    # ── Run browser tests ─────────────────────────────────────────────────────
+    total_passed = 0
+    total_failed = 0
+    screenshots_dir = BASE / ".agent" / "ui_screenshots"
+    screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page    = browser.new_page(viewport={"width": 1440, "height": 900})
+
+            info(f"Opening {base_url} ...")
+            page.goto(base_url, wait_until="networkidle", timeout=15000)
+            time.sleep(1)
+
+            for pg in PAGE_CHECKS:
+                print(f"\n{C}  -- {pg['name']} --{R}")
+                # Navigate to page
+                try:
+                    page.click(pg["click"], timeout=5000)
+                    page.wait_for_selector(pg["wait_for"], timeout=5000)
+                    time.sleep(0.8)  # let JS render dynamic content
+                except Exception as e:
+                    fail(f"  Navigation to {pg['name']} failed: {e}")
+                    total_failed += 1
+                    continue
+
+                # Check each element
+                page_pass = 0
+                page_fail = 0
+                for selector, label in pg["checks"]:
+                    try:
+                        el = page.wait_for_selector(selector, timeout=3000)
+                        if el and el.is_visible():
+                            ok(f"  {label} visible ✓")
+                            page_pass += 1
+                        else:
+                            warn(f"  {label} — not visible")
+                            page_fail += 1
+                    except Exception:
+                        fail(f"  {label} — not found ({selector})")
+                        page_fail += 1
+
+                # Screenshot
+                shot_path = screenshots_dir / f"ui_{pg['name'].lower().replace(' ', '_')}.png"
+                page.screenshot(path=str(shot_path), full_page=False)
+                dim(f"  Screenshot: {shot_path.name}")
+
+                total_passed += page_pass
+                total_failed += page_fail
+
+            browser.close()
+
+    except Exception as e:
+        warn(f"Browser test error: {e}")
+        warn("Browser UI test incomplete — app will still launch.")
+    finally:
+        server_proc.terminate()
+        try:
+            server_proc.wait(timeout=5)
+        except Exception:
+            pass
+
+    print()
+    info(f"Browser UI results: {total_passed} elements OK, {total_failed} failed.")
+    if total_failed == 0:
+        ok("All dashboard pages render correctly ✓")
+    else:
+        warn(f"{total_failed} UI element(s) not found — check screenshots in .agent/ui_screenshots/")
+
+    return total_failed == 0
+
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # STEP 7 — NotebookLM auth reminder
 # ═════════════════════════════════════════════════════════════════════════════
 def check_notebooklm_auth():
@@ -575,8 +772,9 @@ def main():
 
     if not args.skip_tests:
         run_self_test(args.port)
+        run_browser_ui_test(args.port)
     else:
-        info("Skipping self-test (--skip-tests).")
+        info("Skipping tests (--skip-tests).")
 
     if not args.no_launch:
         launch_app(args.port)
