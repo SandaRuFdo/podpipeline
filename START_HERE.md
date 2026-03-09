@@ -64,6 +64,8 @@ Then read and follow:
 ## Key Commands
 
    python start.py                                      # Full setup + launch
+   python start.py --deploy-check                       # ✅ Final deployment readiness test
+   python scripts/test_deployment.py                    # Same test, standalone
    python app.py                                        # Launch app only
    python scripts/mem.py session load                   # Resume session
    python scripts/mem.py topic check "<topic>"          # Check for duplicates

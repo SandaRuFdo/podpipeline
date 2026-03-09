@@ -22,6 +22,7 @@ Flags:
   --skip-tests     Skip the self-test phase
   --port PORT      Custom port (default: 5000)
   --reset-db       Wipe and re-init the memory database (⚠ destructive)
+  --deploy-check   Run full deployment readiness test and exit (no launch)
 """
 
 import argparse
@@ -67,10 +68,12 @@ os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 # ── Argument parsing ──────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(description="PodPipeline — one command setup + launch")
-    p.add_argument("--no-launch",   action="store_true", help="Don't start the server after setup")
-    p.add_argument("--skip-tests",  action="store_true", help="Skip self-test phase")
-    p.add_argument("--port",        type=int, default=5000, help="Server port (default: 5000)")
-    p.add_argument("--reset-db",    action="store_true", help="⚠ Wipe and re-init memory DB")
+    p.add_argument("--no-launch",     action="store_true", help="Don't start the server after setup")
+    p.add_argument("--skip-tests",    action="store_true", help="Skip self-test phase")
+    p.add_argument("--port",          type=int, default=5000, help="Server port (default: 5000)")
+    p.add_argument("--reset-db",      action="store_true", help="Wipe and re-init memory DB")
+    p.add_argument("--deploy-check",  action="store_true",
+                   help="Run full deployment readiness test (syntax+pytest+memory+browser) and exit")
     return p.parse_args()
 
 
@@ -755,6 +758,19 @@ def launch_app(port: int):
 # ═════════════════════════════════════════════════════════════════════════════
 def main():
     args = parse_args()
+
+    # ── Deploy-check shortcut: run test_deployment.py and exit ────────────────
+    if args.deploy_check:
+        deploy_script = BASE / "scripts" / "test_deployment.py"
+        if not deploy_script.exists():
+            fail("scripts/test_deployment.py not found — run 'git pull' first")
+            sys.exit(1)
+        print(f"\n{B}  Running deployment readiness test...{R}\n")
+        result = subprocess.run(
+            [sys.executable, str(deploy_script), "--port", str(args.port)],
+            cwd=str(BASE)
+        )
+        sys.exit(result.returncode)
 
     print(f"\n{B}{'='*56}")
     print(f"  PodPipeline -- Auto Setup & Launch")
