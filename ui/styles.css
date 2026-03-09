@@ -847,6 +847,44 @@ body {
   color: var(--red);
 }
 
+/* ── RUN PIPELINE BUTTON ──────────────────────────────────────────── */
+.btn-run-pipeline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: 1px solid #22c55e60;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: all .18s;
+  box-shadow: 0 0 18px #22c55e30;
+  animation: run-glow 2.5s ease-in-out infinite;
+}
+
+.btn-run-pipeline:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 0 28px #22c55e50;
+  transform: translateY(-1px);
+}
+
+.btn-run-pipeline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  animation: none;
+}
+
+@keyframes run-glow {
+  0%, 100% { box-shadow: 0 0 18px #22c55e30; }
+  50%       { box-shadow: 0 0 32px #22c55e55; }
+}
+
 /* ── SOURCES ──────────────────────────────────────────────────────── */
 .sources-list {
   display: flex;

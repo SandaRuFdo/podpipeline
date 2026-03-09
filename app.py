@@ -175,6 +175,69 @@ def get_episode(eid):
                     "context_preview": ctx[:800], "audience": audience})
 
 
+@app.route("/api/episodes/<int:eid>/prompt")
+def get_episode_prompt(eid):
+    """Generate a pre-filled Antigravity prompt for this episode's full pipeline run."""
+    ep = mem("episode", "get", eid)
+    if not isinstance(ep, dict):
+        return jsonify({"error": "not found"}), 404
+
+    phases   = _get_phases_direct(eid)
+    phase_status = {p["phase"]: p["status"] for p in phases}
+
+    # Find first non-done phase to resume from
+    resume_phase = next(
+        (p for p in PHASE_ORDER if phase_status.get(p) not in ("done", "skipped")),
+        "research"
+    )
+
+    lang      = ep.get("output_language", "en")
+    lang_name = ep.get("language_name", "English")
+    audience  = ep.get("target_audience", "scifi_curious")
+    title     = ep.get("title_de", ep.get("topic", "Unknown"))
+    topic     = ep.get("topic", "")
+    season    = ep.get("season", 1)
+    episode   = ep.get("episode", 1)
+    code      = f"S{int(season):02d}E{int(episode):02d}"
+
+    phase_summary = "\n".join(
+        f"  - {p['phase']}: {p['status']}" for p in phases
+    )
+
+    prompt = f"""# PodPipeline — Start Full Pipeline
+
+You are operating **PodPipeline** — an AI-powered podcast production system.
+Run the full pipeline from start to finish for this episode. Do not stop until all phases are complete.
+
+## Episode Details
+- **ID:** {eid}
+- **Code:** {code}
+- **Title:** {title}
+- **Topic:** {topic}
+- **Language:** {lang_name} ({lang})
+- **Audience:** {audience}
+- **Resume from phase:** {resume_phase}
+
+## Current Phase Status
+{phase_summary}
+
+## Instructions
+1. Read the full workflow: `.agent/skills/german-scifi-podcast/SKILL.md` (use for all phases)
+2. Resume from **{resume_phase}** phase and run ALL remaining phases to completion
+3. After EACH phase completes, call:
+   `python scripts/update_phase.py {eid} <phase> done`
+   This updates the dashboard live.
+4. Do NOT stop until deliverables phase is done and walkthrough.md exists.
+
+## Working Directory
+`episodes/S{int(season):02d}/E{int(episode):02d}_*/`
+
+Start now. Run phase: **{resume_phase}**
+"""
+
+    return jsonify({"prompt": prompt, "episode_id": eid, "resume_phase": resume_phase})
+
+
 
 @app.route("/api/episodes", methods=["POST"])
 def create_episode():

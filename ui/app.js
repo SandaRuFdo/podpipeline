@@ -452,11 +452,15 @@ async function loadEpisodeDetail(eid) {
   const phases = data.phases || [];
   const srcs = data.sources || [];
   const aud = data.audience || null;
-  const lang = _languages.find(l => l.code === (ep.output_language || "de")) || {};
+  const langCode = ep.output_language || "";
+  const lang = _languages.find(l => l.code === langCode) || {};
   const code = `S${String(ep.season).padStart(2, "0")}E${String(ep.episode).padStart(2, "0")}`;
 
   // Header actions
   actions.innerHTML = `
+    <button class="btn-run-pipeline" onclick="runPipeline(${ep.id})" id="run-pipeline-btn-${ep.id}">
+      ▶ Run Full Pipeline
+    </button>
     <button class="btn-icon" title="Init Pipeline" onclick="initPipeline(${ep.id})">🔄 Init</button>
     <button class="btn-icon" title="Export JSON" onclick="exportEpisode(${ep.id})">📥 Export</button>
     <button class="btn-ghost" onclick="navigate('episodes')">All Episodes</button>`;
@@ -464,7 +468,7 @@ async function loadEpisodeDetail(eid) {
   content.innerHTML = `
     <div class="detail-header">
       <div>
-        <div class="detail-code">${code} <span class="lang-pill">${flagImg(ep.output_language || 'en')} ${ep.language_name || "German"}</span></div>
+        <div class="detail-code">${code} <span class="lang-pill">${langCode ? flagImg(langCode) : ''} ${ep.language_name || ''}</span></div>
         <div class="detail-title">${ep.title_de || "—"}</div>
         <div class="detail-topic">${ep.topic || ""}</div>
       </div>
@@ -612,6 +616,89 @@ async function initPipeline(eid) {
   await api(`/api/episodes/${eid}/pipeline/init`, { method: "POST" });
   toast("Pipeline initialized 🔄");
   loadEpisodeDetail(eid);
+}
+
+async function runPipeline(eid) {
+  const btn = document.getElementById(`run-pipeline-btn-${eid}`);
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Loading…"; }
+
+  const data = await api(`/api/episodes/${eid}/prompt`);
+  if (btn) { btn.disabled = false; btn.textContent = "▶ Run Full Pipeline"; }
+
+  if (!data?.prompt) { toast("Could not generate prompt", "error"); return; }
+
+  // Copy to clipboard
+  try {
+    await navigator.clipboard.writeText(data.prompt);
+    toast("✅ Prompt copied to clipboard!", "success");
+  } catch (_) { }
+
+  showPromptModal(data.prompt, data.resume_phase);
+}
+
+function showPromptModal(prompt, resumePhase) {
+  // Remove existing modal
+  document.getElementById("pipeline-prompt-modal")?.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "pipeline-prompt-modal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;padding:20px;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      background:var(--bg2);border:1px solid var(--border);
+      border-radius:16px;max-width:700px;width:100%;max-height:85vh;
+      display:flex;flex-direction:column;overflow:hidden;
+      box-shadow:0 25px 60px rgba(0,0,0,0.6);
+    ">
+      <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)">▶ Run Full Pipeline</div>
+          <div style="font-size:12px;color:var(--accent);margin-top:2px">Resuming from: <strong>${resumePhase || "research"}</strong></div>
+        </div>
+        <button onclick="document.getElementById('pipeline-prompt-modal').remove()" style="
+          background:none;border:none;color:var(--text-dim);font-size:22px;
+          cursor:pointer;padding:4px 8px;border-radius:6px;
+        ">×</button>
+      </div>
+      <div style="padding:16px 24px;background:rgba(99,102,241,0.06);border-bottom:1px solid var(--border)">
+        <div style="font-size:13px;color:var(--text-mid);line-height:1.7">
+          <strong style="color:var(--text)">How to start the pipeline:</strong><br>
+          1. Open a <strong>new Antigravity conversation</strong><br>
+          2. Paste the prompt below → hit <strong>Enter</strong><br>
+          3. Antigravity will run all phases and update the dashboard live ✅
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px 24px">
+        <pre id="pipeline-prompt-text" style="
+          white-space:pre-wrap;word-break:break-word;
+          font-family:var(--mono);font-size:11px;
+          color:var(--text-mid);line-height:1.7;margin:0;
+        ">${escHtml(prompt)}</pre>
+      </div>
+      <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px">
+        <button onclick="
+          navigator.clipboard.writeText(document.getElementById('pipeline-prompt-text').textContent);
+          toast('Copied!','success');
+        " style="
+          flex:1;padding:10px;border-radius:8px;border:none;
+          background:var(--accent);color:#fff;font-size:14px;
+          font-weight:600;cursor:pointer;
+        ">📋 Copy Prompt</button>
+        <button onclick="document.getElementById('pipeline-prompt-modal').remove()" style="
+          padding:10px 20px;border-radius:8px;
+          border:1px solid var(--border);background:none;
+          color:var(--text-dim);font-size:14px;cursor:pointer;
+        ">Close</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener("click", e => { if (e.target === modal) modal.remove(); });
 }
 
 function exportEpisode(eid) {
