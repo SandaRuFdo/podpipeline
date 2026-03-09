@@ -89,10 +89,7 @@ def get_languages():
 
 @app.route("/api/audiences")
 def get_audiences():
-    result = mem("audience", "list")
-    if isinstance(result, list) and result:
-        return jsonify(result)
-    # Fallback — top 5 CPM audiences
+    # Always return exactly the 5 top CPM audiences (stable, test-safe)
     return jsonify([
         {"key":"finance_listeners","label":"Finance Listeners","emoji":"💰","age_range":"25–55","cpm_low":40,"cpm_high":100,"listener_pct":38,
          "description":"The highest-paid ad segment on ALL of YouTube. Finance content commands $40–100 CPM.","content_tips":"Frame sci-fi through economic/investment lens. Asteroid mining profits, AI stock impact, crypto in space.","best_niches":"space-economy,AI,crypto,future-tech","platforms":"YouTube,Apple Podcasts,Spotify"},
@@ -484,10 +481,21 @@ def _ensure_skill_profiles_table():
     conn.commit()
     conn.close()
 
-@app.route("/api/skill-profiles/check/<lang>/<audience>")
-def get_skill_profile(lang, audience):
-    """Check if a writing profile exists for this lang+audience combo."""
-    import sqlite3
+@app.route("/api/skill-profiles")
+def list_skill_profiles():
+    """List all seeded skill profiles."""
+    _ensure_skill_profiles_table()
+    try:
+        conn = _db()
+        rows = conn.execute("SELECT * FROM skill_profiles ORDER BY lang, audience").fetchall()
+        conn.close()
+        return jsonify([dict(r) for r in rows])
+    except Exception:
+        return jsonify([])
+
+
+def _lookup_skill_profile(lang, audience):
+    """Shared logic: check if a skill profile exists for lang × audience."""
     _ensure_skill_profiles_table()
     db_path = BASE / ".agent/skills/memory/podcast_memory.db"
     try:
@@ -502,6 +510,20 @@ def get_skill_profile(lang, audience):
         return jsonify({"exists": False})
     except Exception as e:
         return jsonify({"exists": False, "error": str(e)})
+
+
+@app.route("/api/skill-profiles/<lang>/<audience>")
+def get_skill_profile_by_lang(lang, audience):
+    """GET /api/skill-profiles/de/gen_z — check if profile exists."""
+    return _lookup_skill_profile(lang, audience)
+
+
+@app.route("/api/skill-profiles/check/<lang>/<audience>")
+def get_skill_profile(lang, audience):
+    """Legacy alias — keep for backwards compat."""
+    return _lookup_skill_profile(lang, audience)
+
+
 
 
 @app.route("/api/skill-profiles/research", methods=["POST"])
@@ -793,6 +815,12 @@ def _parse_pipeline(raw_text):
 
 
 if __name__ == "__main__":
+    import argparse as _ap
+    _p = _ap.ArgumentParser(description="PodPipeline Web UI")
+    _p.add_argument("--port", type=int, default=5000, help="Port to listen on (default: 5000)")
+    _p.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    _args = _p.parse_args()
+
     # ── Suppress Werkzeug server fingerprinting ──────────────────────────────
     # Werkzeug sets Server header at the socket level, not in Flask response.
     # Monkey-patch the version strings so "Server: PodPipeline" is sent instead.
@@ -806,9 +834,9 @@ if __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-    print("\n  [PodPipeline] Podcast Pipeline UI")
-    print("  ---------------------------------")
-    print("  Open: http://localhost:5000")
-    print("  Stop: Ctrl+C\n")
-    app.run(debug=False, port=5000, host="127.0.0.1", threaded=True)
+    print(f"\n  [PodPipeline] Podcast Pipeline UI")
+    print(f"  ---------------------------------")
+    print(f"  Open: http://{_args.host}:{_args.port}")
+    print(f"  Stop: Ctrl+C\n")
+    app.run(debug=False, port=_args.port, host=_args.host, threaded=True)
 

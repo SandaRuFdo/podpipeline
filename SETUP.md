@@ -1,177 +1,122 @@
-# 🚀 PodPipeline — Setup Guide for a New Machine
+# 🚀 PodPipeline — Setup Guide
 
-> Hand this entire file to your **Antigravity AI** and say:
-> *"Follow SETUP.md step by step to install PodPipeline on my laptop"*
-
----
-
-## Clone URL
-
-```
-https://github.com/SandaRuFdo/podpipeline.git
-```
+> **TL;DR — One command after cloning:**
+> ```bash
+> python start.py
+> ```
+> That's it. Install, init, test, launch — all automatic.
 
 ---
 
-## Step 1 — Prerequisites
+## Prerequisites
 
-Make sure you have:
-- **Python 3.10+** (check: `python --version`)
-- **Git** (check: `git --version`)
-- **ffmpeg** (check: `ffmpeg -version`) — needed for audio/image processing
-  - Windows: `winget install ffmpeg` or download from https://ffmpeg.org/download.html
+Make sure you have installed:
+- **Python 3.10+** — check: `python --version`
+- **Git** — check: `git --version`
+- **ffmpeg** — needed for image resize (Phase 6)
+  - Windows: `winget install ffmpeg`
+  - macOS: `brew install ffmpeg`
+  - Ubuntu: `sudo apt install ffmpeg`
 - A **Google account** (for NotebookLM audio generation)
 
 ---
 
-## Step 2 — Clone the project
+## Clone the repo
 
-```powershell
+```bash
 git clone https://github.com/SandaRuFdo/podpipeline.git
 cd podpipeline
 ```
 
-> Choose a good home folder, e.g. `C:\Users\YourName\Documents\podpipeline`
-
 ---
 
-## Step 3 — Install Python dependencies
+## Run the starter command
 
-```powershell
-pip install -r requirements.txt
+```bash
+python start.py
 ```
 
-This installs:
-- `Flask` — web server
-- `faster-whisper` — audio transcription
-- `yt-dlp` — YouTube subtitle downloader  
-- `notebooklm-py` — AI audio generation
-- `google-genai`, `google-auth` — Google AI APIs
+**What it does automatically:**
+
+| Step | Action |
+|------|--------|
+| 1 | Python 3.10+ version check |
+| 2 | ffmpeg detection (warns if missing) |
+| 3 | `pip install -r requirements.txt` |
+| 4 | Memory database init (SQLite) |
+| 5 | Seed 30 writing profiles (language × audience) |
+| 6 | Self-test — checks all API endpoints, auto-fixes if broken |
+| 7 | NotebookLM auth check (warns if not logged in) |
+| 8 | Launches the app at http://localhost:5000 |
 
 ---
 
-## Step 4 — Authenticate with NotebookLM
+## NotebookLM login (one-time, manual step)
 
-This **opens a browser tab** for Google login. Required to generate podcast audio.
+`start.py` will warn you if this hasn't been done. Run once:
 
-```powershell
+```bash
 notebooklm login
 ```
 
-1. Browser opens → Sign in with your Google account
-2. Grant permissions
-3. Terminal shows: `✅ Login successful`
-
-> You only do this once. Credentials are saved to `~/.notebooklm/`
+A browser tab opens → sign in with Google → done.  
+Credentials saved to `~/.notebooklm/` — never needs repeating.
 
 ---
 
-## Step 5 — Initialize the memory database
+## Optional flags
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-python .agent/skills/memory/scripts/memory.py init
+```bash
+python start.py --no-launch     # Install + test only, don't start server
+python start.py --skip-tests    # Skip self-test (faster)
+python start.py --port 8080     # Use a different port
+python start.py --reset-db      # ⚠ Wipe DB and re-init from scratch
 ```
 
-Expected output: `Database ready: ...podcast_memory.db`
-
 ---
 
-## Step 6 — Seed skill profiles (30 writing profiles)
+## Quick verify after launch
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-python scripts/seed_all_profiles.py
+```bash
+python scripts/mem.py stats
+python scripts/mem.py profile list
 ```
 
-Expected output: `✅ Seeded 30 skill profiles`
-
-> These are the AI writing personality profiles (language × audience combos)
-
----
-
-## Step 7 — Launch the web tool
-
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-python app.py
-```
-
-Open your browser at: **http://localhost:5000**
-
----
-
-## Quick Verify — Everything works
-
-Run this to check the memory system is ready:
-
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-python .agent/skills/memory/scripts/memory.py stats
-python .agent/skills/memory/scripts/memory.py profile list
-python .agent/skills/memory/scripts/memory.py contract list
-```
-
-You should see:
-- Stats with 0 episodes (fresh start)
-- 30 skill profiles listed
-- 8 workflow phases listed
-
----
-
-## Creating Your First Episode
-
-1. Go to **http://localhost:5000**
-2. Click **New Episode** in the sidebar
-3. Fill in:
-   - Season / Episode number (e.g. 1 / 1)
-   - Folder slug (e.g. `Dark_Matter`)
-   - German title + topic
-   - Pick language + audience
-4. Click **Create Episode**
-5. Your Antigravity AI will run the 8-phase pipeline
+You should see: 0 episodes (fresh start) + 30 skill profiles.
 
 ---
 
 ## Troubleshooting
 
 | Problem | Fix |
-|---|---|
-| `ModuleNotFoundError` | Run `pip install -r requirements.txt` again |
-| `notebooklm: command not found` | Run `pip install notebooklm-py` |
-| Port 5000 in use | Kill the process or change port in `app.py` |
-| Database errors | Run `python .agent/skills/memory/scripts/memory.py init` |
-| Auth expired | Run `notebooklm login` again |
+|---------|-----|
+| `ModuleNotFoundError` | `pip install -r requirements.txt` |
+| `notebooklm: command not found` | `pip install notebooklm-py` |
+| Port 5000 in use | `python start.py --port 8080` |
+| Database errors | `python start.py --reset-db` |
+| Auth expired | `notebooklm login` |
 | ffmpeg not found | Install ffmpeg and add to PATH |
 
 ---
 
-## Project Folder Structure
+## Project Structure
 
 ```
 podpipeline/
-├── app.py                  ← Start here: python app.py
-├── setup.py                ← Alternative: python setup.py
+├── start.py                ← START HERE: python start.py
+├── app.py                  ← Web UI server
 ├── requirements.txt
 ├── .agent/
 │   ├── skills/
 │   │   ├── memory/         ← SQLite DB + 30 writing profiles
 │   │   ├── notebooklm/     ← Audio generation skill
-│   │   ├── german-scifi-podcast/ ← Podcast director skill
-│   │   ├── audio-listener/ ← Whisper transcription skill
+│   │   ├── german-scifi-podcast/
+│   │   ├── audio-listener/ ← Whisper transcription
 │   │   └── youtube-podcast-researcher/
 │   └── workflows/
-│       └── podcast-pipeline.md  ← The full 8-phase workflow
+│       └── podcast-pipeline.md  ← Full 8-phase workflow
 ├── core/                   ← Episode creation + pipeline logic
-├── scripts/                ← force_16x9.py, seed profiles
+├── scripts/                ← mem.py, force_16x9.py, seed profiles
 ├── ui/                     ← Web frontend (HTML/CSS/JS)
 └── episodes/               ← Your output (git-ignored)
 ```
-
----
-
-## For Antigravity — One-Shot Setup Command
-
-Tell your Antigravity AI:
-
-> *"Clone https://github.com/SandaRuFdo/podpipeline.git, run pip install -r requirements.txt, run notebooklm login in a browser tab, init the memory DB, seed the profiles, then launch the app and open http://localhost:5000"*

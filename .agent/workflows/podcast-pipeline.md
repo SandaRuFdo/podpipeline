@@ -13,22 +13,19 @@ description: End-to-end German sci-fi podcast production — from topic to YouTu
 **Input:** Topic from user via UI  
 **Output:** German MP3 + 16:9 visuals + CapCut walkthrough — all in the episode folder
 
-> **Windows note:** Always set `$env:PYTHONIOENCODING="utf-8"` before any Python command.
+> **Windows note:** Always ensure `PYTHONIOENCODING=utf-8` is set. All scripts do this automatically.
 
 
 ---
 
 ## BEFORE STARTING — Check Memory
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-$MEM = "python .agent/skills/memory/scripts/memory.py"
-
+```bash
 # Check if topic was already covered
-& $MEM topic check "<topic>"
+python scripts/mem.py topic check "<topic>"
 
 # Load character bible for script consistency
-& $MEM context
+python scripts/mem.py context
 ```
 
 ---
@@ -37,14 +34,14 @@ $MEM = "python .agent/skills/memory/scripts/memory.py"
 
 ```bash
 # One command does everything: folder + memory + README
-python new_episode.py \
+python core/new_episode.py \
   --season 1 --episode 2 \
   --slug "Dark_Matter" \
   --title-de "Dunkle Materie" \
   --title-en "Dark Matter" \
   --topic "dark matter physics mystery"
 
-# → Script prints the episode Memory ID — note it as $EID
+# → Script prints the episode Memory ID — note it as EID
 # → Folder created: episodes/S01/E02_Dark_Matter/
 ```
 
@@ -52,7 +49,6 @@ python new_episode.py \
 # Set these vars for the rest of the pipeline
 EP  = "episodes/S01/E02_Dark_Matter"
 EID = 2   # from new_episode.py output
-MEM = "python .agent/skills/memory/scripts/memory.py"
 ```
 
 ---
@@ -64,52 +60,52 @@ MEM = "python .agent/skills/memory/scripts/memory.py"
 
 ### 2.1 Find viral English content on the topic
 
-```powershell
+```bash
 # Search YouTube for relevant podcasts/documentaries
-yt-dlp --flat-playlist --print "%(id)s | %(title)s | %(view_count)s views | %(duration_string)s" `
+yt-dlp --flat-playlist --print "%(id)s | %(title)s | %(view_count)s views | %(duration_string)s" \
   "ytsearch20:<topic> documentary science"
 
 # Pick the best video, check subtitles
 yt-dlp --list-subs "https://youtube.com/watch?v=VIDEO_ID"
 
 # Download subtitles only (no video)
-yt-dlp --write-subs --write-auto-subs --sub-lang en --sub-format srt --skip-download `
-  -o "$EP/1_research/sources/%(title)s.%(ext)s" `
+yt-dlp --write-subs --write-auto-subs --sub-lang en --sub-format srt --skip-download \
+  -o "<ep_path>/1_research/sources/%(title)s.%(ext)s" \
   "https://youtube.com/watch?v=VIDEO_ID"
 
 # Convert SRT to clean text
-python .agent/skills/youtube-podcast-researcher/scripts/srt_to_text.py `
-  "$EP/1_research/sources/<title>.en.srt"
+python .agent/skills/youtube-podcast-researcher/scripts/srt_to_text.py \
+  "<ep_path>/1_research/sources/<title>.en.srt"
 ```
 
 ### 2.2 Log sources in memory
 
-```powershell
-& $MEM source add $EID youtube "<video title>" "https://youtube.com/..."
-& $MEM source add $EID wikipedia "<article title>" "https://en.wikipedia.org/..."
-& $MEM log $EID research "English sources downloaded for script writing"
+```bash
+python scripts/mem.py source add <episode_id> youtube "<video title>" "https://youtube.com/..."
+python scripts/mem.py source add <episode_id> wikipedia "<article title>" "https://en.wikipedia.org/..."
+python scripts/mem.py log <episode_id> research "English sources downloaded for script writing"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID research done
+python scripts/update_phase.py <episode_id> research done
 ```
 
 ---
 
 ## PHASE 3 — Script Writing (Profile-Driven)
 
-> Read the English sources from `$EP/1_research/sources/` to deeply understand the topic.
+> Read the English sources from `<ep_path>/1_research/sources/` to deeply understand the topic.
 > Then write a script guided by the matching **skill profile** for this episode's language + audience.
 
 ### 3.1 Load writing profile + memory context
 
-```powershell
+```bash
 # Load the tailored writing profile for this episode's language × audience
 # This outputs tone, slang, vocab, cultural refs, hooks, and avoid-list
-& $MEM profile context $LANG $AUDIENCE
-# Example: & $MEM profile context de gen_z
+python scripts/mem.py profile context <lang_code> <audience_key>
+# Example: python scripts/mem.py profile context de gen_z
 
 # Load episode memory for character consistency
-& $MEM context $EID
+python scripts/mem.py context <episode_id>
 ```
 
 > **The profile context IS the writing directive.** It tells you exactly:
@@ -122,7 +118,7 @@ python scripts/update_phase.py $EID research done
 
 ### 3.2 Write the script
 
-Use **German SciFi Podcast Director** skill + the loaded profile. Save to `$EP/2_script/SCRIPT_$LANG.md`:
+Use **German SciFi Podcast Director** skill + the loaded profile. Save to `<ep_path>/2_script/SCRIPT_<LANG>.md`:
 
 - **Structure:** Cold Open → Theme Intro → Act 1 → Act 2 (Twist) → Act 3 → Outro
 - **Tone:** As defined in the skill profile (NOT hardcoded)
@@ -133,13 +129,13 @@ Use **German SciFi Podcast Director** skill + the loaded profile. Save to `$EP/2
 
 ### 3.3 Write English translation
 
-Save to `$EP/2_script/SCRIPT_EN.md` — section-by-section for user review.
+Save to `<ep_path>/2_script/SCRIPT_EN.md` — section-by-section for user review.
 
-```powershell
-& $MEM log $EID script "Script written with profile: $LANG × $AUDIENCE"
+```bash
+python scripts/mem.py log <episode_id> script "Script written with profile: <lang> × <audience>"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID script done
+python scripts/update_phase.py <episode_id> script done
 ```
 
 ---
@@ -151,22 +147,20 @@ python scripts/update_phase.py $EID script done
 
 ### 4.1 Create a fresh notebook for audio generation
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-
-notebooklm create "S{0:D2}E{1:D2} - <Topic Title>" --json
+```bash
+notebooklm create "S01E02 - <Topic Title>" --json
 # → Save notebook ID
 notebooklm use <notebook_id>
 
 # Update memory with notebook ID
-& $MEM episode update $EID notebook_id <notebook_id>
+python scripts/mem.py episode update <episode_id> notebook_id <notebook_id>
 ```
 
 ### 4.2 Add ONLY the German script as source
 
-```powershell
+```bash
 # This is the ONLY source — no English transcripts, no Wikipedia
-notebooklm source add "$EP/2_script/SCRIPT_DE.md" --json
+notebooklm source add "<ep_path>/2_script/SCRIPT_DE.md" --json
 
 # Wait for source to be ready
 notebooklm source list --json   # Check "status": "ready"
@@ -174,15 +168,15 @@ notebooklm source list --json   # Check "status": "ready"
 
 ### 4.3 Generate audio
 
-```powershell
+```bash
 # Set German language
 notebooklm language set de
 
 # Get memory context and inject into prompt
-$CTX = & $MEM context $EID
+python scripts/mem.py context <episode_id>
 
 # Generate audio with full Nova/Max mega-prompt
-notebooklm generate audio "KONTEXT: Deutsche Sci-Fi Podcast-Serie fuer Gen Z Science-Nerds. HOSTS: Zwei Freunde — einer erzhlt die Story, der andere reagiert mit 'Warte, WAS?!' und stellt Fragen. STIL: Locker, witzig, Gaming und Anime Analogien. STRUKTUR: Dramatischer Einstieg, ueberraschender Twist, nachdenkliches Ende mit Cliffhanger." `
+notebooklm generate audio "KONTEXT: Deutsche Sci-Fi Podcast-Serie fuer Gen Z Science-Nerds. HOSTS: Zwei Freunde — einer erzaehlt die Story, der andere reagiert mit 'Warte, WAS?!' und stellt Fragen. STIL: Locker, witzig, Gaming und Anime Analogien. STRUKTUR: Dramatischer Einstieg, ueberraschender Twist, nachdenkliches Ende mit Cliffhanger." \
   --format deep-dive --length long --language de --retry 3 --json
 # → Save artifact_id
 
@@ -190,38 +184,36 @@ notebooklm generate audio "KONTEXT: Deutsche Sci-Fi Podcast-Serie fuer Gen Z Sci
 notebooklm artifact wait <artifact_id> --timeout 1200
 
 # Download
-notebooklm download audio "$EP/3_audio/podcast.mp3"
+notebooklm download audio "<ep_path>/3_audio/podcast.mp3"
 
-& $MEM episode update $EID ep_path $EP
-& $MEM log $EID audio "Podcast generated and downloaded"
+python scripts/mem.py episode update <episode_id> ep_path "<ep_path>"
+python scripts/mem.py log <episode_id> audio "Podcast generated and downloaded"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID audio done
+python scripts/update_phase.py <episode_id> audio done
 ```
 
 ---
 
 ## PHASE 5 — Transcribe Audio (Get Real Timestamps)
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-
-python .agent/skills/audio-listener/scripts/transcribe.py `
-  "$EP/3_audio/podcast.mp3" `
-  --model small --language de --format segments `
-  --output "$EP/3_audio/transcript.txt"
+```bash
+python .agent/skills/audio-listener/scripts/transcribe.py \
+  "<ep_path>/3_audio/podcast.mp3" \
+  --model small --language de --format segments \
+  --output "<ep_path>/3_audio/transcript.txt"
 
 # Update duration in memory
-& $MEM episode update $EID audio_dur <seconds>
-& $MEM log $EID transcribe "Audio transcribed with timestamps"
+python scripts/mem.py episode update <episode_id> audio_dur <seconds>
+python scripts/mem.py log <episode_id> transcribe "Audio transcribed with timestamps"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID transcribe done
+python scripts/update_phase.py <episode_id> transcribe done
 ```
 
 ### 5.1 Map topic transitions
 
-Read `transcript.txt` and create `$EP/5_deliverables/SLIDE_SOURCE.md`:
+Read `transcript.txt` and create `<ep_path>/5_deliverables/SLIDE_SOURCE.md`:
 
 ```markdown
 | Slide | Start | End   | Section      | Visual Description                    |
@@ -246,7 +238,7 @@ Read `transcript.txt` and create `$EP/5_deliverables/SLIDE_SOURCE.md`:
 
 ### 6.1 Read the slide source and prepare all prompts
 
-Read `$EP/5_deliverables/SLIDE_SOURCE.md`. Write ALL prompts upfront before generating anything.
+Read `<ep_path>/5_deliverables/SLIDE_SOURCE.md`. Write ALL prompts upfront before generating anything.
 
 **MAXIMUM QUALITY prompt template (mandatory for every single slide):**
 ```
@@ -266,8 +258,8 @@ flat colors, amateur, low quality.
 - "Practical light from glowing screens, cool blue-green tones..."
 
 **Check visual style from memory:**
-```powershell
-& $MEM style get <topic_type>
+```bash
+python scripts/mem.py style get <topic_type>
 # e.g. military, space, biology, tech, paranormal
 ```
 
@@ -287,23 +279,22 @@ BATCH 2 (fire all at once):
 ... continue until all slides done
 ```
 
-Save all images to `$EP/4_visuals/` as `slide01_<desc>.png`, `slide02_<desc>.png`, etc.
+Save all images to `<ep_path>/4_visuals/` as `slide01_<desc>.png`, `slide02_<desc>.png`, etc.
 
 ### 6.3 Force 1920×1080 (ONE batch run at the end)
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-python scripts/force_16x9.py "$EP/4_visuals/"
+```bash
+python scripts/force_16x9.py "<ep_path>/4_visuals/"
 ```
 
 > Run this **ONCE after all slides are generated** — not after every image.
 > This ffmpeg scale+pad step is non-negotiable. Every image must be exactly 1920×1080 before CapCut.
 
-```powershell
-& $MEM log $EID visuals "N slides generated in parallel batches + force_16x9 → 1920x1080"
+```bash
+python scripts/mem.py log <episode_id> visuals "N slides generated in parallel batches + force_16x9 → 1920x1080"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID visuals done
+python scripts/update_phase.py <episode_id> visuals done
 ```
 
 
@@ -314,7 +305,7 @@ python scripts/update_phase.py $EID visuals done
 
 ### 7.1 Create CapCut walkthrough
 
-Save to `$EP/5_deliverables/walkthrough.md`:
+Save to `<ep_path>/5_deliverables/walkthrough.md`:
 
 ```markdown
 # CapCut Walkthrough — [Episode Title]
@@ -328,14 +319,14 @@ Audio: 3_audio/podcast.mp3
 
 ### 7.2 Register topic & quality in memory
 
-```powershell
-& $MEM topic add "<topic>" <category> <controversy 1-10> <appeal 1-10>
-& $MEM quality add $EID overall "what worked well" "what to improve" "specific change" <rating>
-& $MEM episode update $EID status complete
-& $MEM log $EID package "Episode complete"
+```bash
+python scripts/mem.py topic add "<topic>" <category> <controversy 1-10> <appeal 1-10>
+python scripts/mem.py quality add <episode_id> overall "what worked well" "what to improve" "specific change" <rating>
+python scripts/mem.py episode update <episode_id> status complete
+python scripts/mem.py log <episode_id> package "Episode complete"
 
 # ✅ Update UI dashboard after phase complete
-python scripts/update_phase.py $EID deliverables done
+python scripts/update_phase.py <episode_id> deliverables done
 ```
 
 ---
@@ -348,21 +339,19 @@ python scripts/update_phase.py $EID deliverables done
 
 ### 8.1 Create cinematic notebook
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-
+```bash
 # Create a SEPARATE notebook — English sources only
 notebooklm create "Cinematic - <topic>" --json
-# → Save notebook ID as $CIN_NB
+# → Save notebook ID as CIN_NB
 notebooklm use <cin_notebook_id>
 ```
 
 ### 8.2 Add ONLY English sources
 
-```powershell
+```bash
 # Add the English research sources from Phase 2
 # These are the YouTube transcripts, Wikipedia articles, etc.
-notebooklm source add "$EP/1_research/sources/<english_transcript>.txt" --json
+notebooklm source add "<ep_path>/1_research/sources/<english_transcript>.txt" --json
 notebooklm source add "https://en.wikipedia.org/wiki/<topic>" --json
 # Add any other English URLs used during research
 notebooklm source add "<english_source_url>" --json
@@ -373,11 +362,11 @@ notebooklm source list --json   # Check all "status": "ready"
 
 > ⚠️ Do NOT add the German script here. This notebook is English-only for cinematic generation.
 
-```powershell
-& $MEM log $EID cinematic "Cinematic notebook created with English sources"
+```bash
+python scripts/mem.py log <episode_id> cinematic "Cinematic notebook created with English sources"
 
 # ✅ Update UI dashboard
-python scripts/update_phase.py $EID cinematic done
+python scripts/update_phase.py <episode_id> cinematic done
 ```
 
 ---
