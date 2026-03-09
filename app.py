@@ -1557,15 +1557,6 @@ if __name__ == "__main__":
     _p.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
     _args = _p.parse_args()
 
-    # ── Suppress Werkzeug server fingerprinting ──────────────────────────────
-    # Werkzeug sets Server header at the socket level, not in Flask response.
-    # Monkey-patch the version strings so "Server: PodPipeline" is sent instead.
-    try:
-        from werkzeug.serving import WSGIRequestHandler
-        WSGIRequestHandler.server_version = "PodPipeline"
-        WSGIRequestHandler.sys_version = ""
-    except ImportError:
-        pass
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -1574,5 +1565,18 @@ if __name__ == "__main__":
     print(f"  ---------------------------------")
     print(f"  Open: http://{_args.host}:{_args.port}")
     print(f"  Stop: Ctrl+C\n")
-    app.run(debug=False, port=_args.port, host=_args.host, threaded=True)
+
+    # ── Use waitress (production WSGI server) ────────────────────────────────
+    # waitress has no "development server" warning and is safe for local use.
+    # Falls back to Flask dev server only if waitress is not installed.
+    try:
+        from waitress import serve
+        serve(app, host=_args.host, port=_args.port, threads=8)
+    except ImportError:
+        # waitress not installed yet — fall back gracefully
+        import logging
+        log = logging.getLogger("werkzeug")
+        log.setLevel(logging.WARNING)
+        app.run(debug=False, port=_args.port, host=_args.host, threaded=True)
+
 
