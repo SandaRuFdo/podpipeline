@@ -82,35 +82,51 @@ python scripts/install_gpu_support.py
 
 This installs CUDA support for faster-whisper. Whisper transcription becomes 4–8× faster.
 
-## Step 6 — Final smoke test
+## Step 6 — Final smoke test (automated)
 
-Run all of these. Every single one must pass without errors:
+Run the automated smoke test. It checks all 10 system requirements and reports PASS/FAIL:
 
 ```bash
-# 1. Core Python dependencies
-python -c "import flask, faster_whisper; print('Core deps OK')"
-
-# 2. NotebookLM CLI working
-notebooklm list
-
-# 3. ffmpeg available
-ffmpeg -version
-
-# 4. yt-dlp available
-yt-dlp --version
-
-# 5. Memory database working
-python scripts/mem.py stats
-
-# 6. Characters seeded
-python scripts/mem.py char list
-
-# 7. Visual styles seeded
-python scripts/mem.py style get tech
-
-# 8. Server reachable (run this after starting the server)
-curl http://localhost:5000/api/languages
+python scripts/smoke_test.py
 ```
+
+This runs 10 checks automatically:
+1. Python 3.10+
+2. Core deps (flask, faster-whisper)
+3. ffmpeg in PATH
+4. yt-dlp installed
+5. notebooklm-py CLI installed
+6. Memory DB working
+7. Characters seeded (NOVA + MAX)
+8. Visual style 'tech' seeded
+9. `.agent/device_config.json` exists
+10. `.agent/whisper_model.txt` exists
+
+Expected output:
+```
+==================================================
+  PodPipeline — Smoke Test
+==================================================
+
+  [PASS] Python 3.x (need 3.10+)
+  [PASS] Core deps (flask, faster_whisper)
+  [PASS] ffmpeg in PATH
+  [PASS] yt-dlp installed
+  [PASS] notebooklm-py CLI installed
+  [PASS] Memory DB working
+  [PASS] Characters seeded (NOVA + MAX)
+  [PASS] Visual style 'tech' seeded
+  [PASS] .agent/device_config.json exists
+  [PASS] .agent/whisper_model.txt exists
+
+  PASSED: 10/10
+
+  ✅ All checks passed — PodPipeline is ready!
+  Open http://localhost:5000 to start your first episode.
+==================================================
+```
+
+If any checks show `[FAIL]`, fix the listed issues and re-run `python scripts/smoke_test.py` until all pass.
 
 ## Step 7 — Confirm ready
 
