@@ -22,16 +22,21 @@ Writing profiles:    30 pre-seeded profiles (language × audience) — each has 
 
    python start.py
 
-This automatically:
-  - Installs all pip dependencies
-  - Initializes the SQLite memory database
-  - Seeds 30 audience × language writing profiles
-  - Runs 27 API self-tests and auto-fixes any issues
-  - Launches the app at http://localhost:5000
+This automatically runs:
 
-NotebookLM login (one-time only):
+  1. Python 3.10+ check
+  2. ffmpeg check (warns if missing)
+  3. pip install all dependencies
+  3.5 **Whisper model selection** — asks you to pick tiny / small / medium / large-v3, then downloads it
+  3.6 **GPU detection** — finds NVIDIA / AMD / Intel GPU and saves config for transcription
+  4. Memory database init (SQLite)
+  5. Seed 30 audience × language writing profiles
+  6. Self-test — 27 API health checks with auto-fix
+  7. NotebookLM auth check
+  8. Launches app at http://localhost:5000
+
+NotebookLM login (one-time only, open a browser):
    notebooklm login
-   (Opens browser — sign in with Google account)
 
 ## Resuming an Existing Session
 
