@@ -1,5 +1,5 @@
 ---
-description: End-to-end German sci-fi podcast production — from topic to YouTube-ready deliverables
+description: End-to-end multi-language, multi-audience podcast production — from topic to YouTube-ready deliverables
 ---
 // turbo-all
 
@@ -10,8 +10,8 @@ description: End-to-end German sci-fi podcast production — from topic to YouTu
 > **Antigravity is the brain and executor.** After input is received, I run all phases autonomously.  
 > No other AI, no automation bot. Just me, the tools, and the output folders.
 
-**Input:** Topic from user via UI  
-**Output:** German MP3 + 16:9 visuals + CapCut walkthrough — all in the episode folder
+**Input:** Topic, output language, and target audience from user via UI  
+**Output:** MP3 in the selected language + 16:9 visuals + CapCut walkthrough — all in the episode folder
 
 > **Windows note:** Always ensure `PYTHONIOENCODING=utf-8` is set. All scripts do this automatically.
 
@@ -168,26 +168,42 @@ notebooklm source list --json   # Check "status": "ready"
 
 ### 4.3 Generate audio
 
-```bash
-# Set German language
-notebooklm language set de
+> ⚠️ **NEVER run `notebooklm language set <lang>`** — that is a GLOBAL setting that
+> changes the language for ALL notebooks in the account. It will corrupt other episodes
+> running in different languages.
+>
+> ✅ **ALWAYS use `--language <code>` on the `generate audio` command** — this is scoped
+> to that single generation call only and does not affect any other notebook.
 
+```bash
 # Get memory context and inject into prompt
 python scripts/mem.py context <episode_id>
 
-# Generate audio with full Nova/Max mega-prompt
-notebooklm generate audio "KONTEXT: Deutsche Sci-Fi Podcast-Serie fuer Gen Z Science-Nerds. HOSTS: Zwei Freunde — einer erzaehlt die Story, der andere reagiert mit 'Warte, WAS?!' und stellt Fragen. STIL: Locker, witzig, Gaming und Anime Analogien. STRUKTUR: Dramatischer Einstieg, ueberraschender Twist, nachdenkliches Ende mit Cliffhanger." \
-  --format deep-dive --length long --language de --retry 3 --json
+# Load the writing profile for this language + audience
+python scripts/mem.py profile context <LANG> <AUDIENCE>
+
+# LANG = episode output language code (de / en / es / fr / pt_BR etc.)
+# AUDIENCE = target audience slug (gen_z / millennials / tech_enthusiasts etc.)
+# Use the values stored in memory from Phase 1 — never hardcode.
+
+# Generate audio — language scoped to THIS notebook only via --language flag
+notebooklm generate audio \
+  "<Inject writing profile tone + style from memory here. Describe hosts, format, \
+   structure, and energy in the TARGET LANGUAGE. Pull exact tone descriptors from \
+   the skill profile loaded above. Tailor slang, references, and humor for AUDIENCE.>" \
+  --language <LANG> \
+  --format deep-dive --length long \
+  --retry 3 --json
 # → Save artifact_id
 
 # Wait for generation (10-20 min)
-notebooklm artifact wait <artifact_id> --timeout 1200
+notebooklm artifact wait <artifact_id> -n <notebook_id> --timeout 1200
 
 # Download
-notebooklm download audio "<ep_path>/3_audio/podcast.mp3"
+notebooklm download audio "<ep_path>/3_audio/podcast.mp3" -a <artifact_id> -n <notebook_id>
 
 python scripts/mem.py episode update <episode_id> ep_path "<ep_path>"
-python scripts/mem.py log <episode_id> audio "Podcast generated and downloaded"
+python scripts/mem.py log <episode_id> audio "Podcast generated in <LANG> for <AUDIENCE>"
 
 # ✅ Update UI dashboard after phase complete
 python scripts/update_phase.py <episode_id> audio done
@@ -198,14 +214,17 @@ python scripts/update_phase.py <episode_id> audio done
 ## PHASE 5 — Transcribe Audio (Get Real Timestamps)
 
 ```bash
+# Use <LANG> from episode memory — matches whatever language was used in Phase 4
 python .agent/skills/audio-listener/scripts/transcribe.py \
   "<ep_path>/3_audio/podcast.mp3" \
-  --model small --language de --format segments \
+  --language <LANG> --format segments \
   --output "<ep_path>/3_audio/transcript.txt"
+# --model is auto-loaded from .agent/whisper_model.txt (set during start.py setup)
+# --device is auto-loaded from .agent/device_config.json (GPU or CPU)
 
 # Update duration in memory
 python scripts/mem.py episode update <episode_id> audio_dur <seconds>
-python scripts/mem.py log <episode_id> transcribe "Audio transcribed with timestamps"
+python scripts/mem.py log <episode_id> transcribe "Audio transcribed (<LANG>)"
 
 # ✅ Update UI dashboard after phase complete
 python scripts/update_phase.py <episode_id> transcribe done
