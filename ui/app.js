@@ -33,6 +33,7 @@ let _audiences = [];
 let _episodes = [];
 let _filters = { status: "", lang: "" };
 let _filterDash = "all";
+let currentLogSource = null;  // For live episode logs
 
 // ── API ────────────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ function toast(msg, type = "info") {
 // ── ROUTER ─────────────────────────────────────────────────────────────────────
 
 function navigate(page, data = null) {
+  if (currentLogSource) { currentLogSource.close(); currentLogSource = null; }
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-link").forEach(l => l.classList.remove("active"));
   const el = document.getElementById(`page-${page}`);
@@ -494,6 +496,22 @@ async function loadEpisodeDetail(eid) {
             ` : ""}
           </div>
         </div>
+
+        <!-- LIVE LOG TERMINAL -->
+        <div class="card" style="padding:0;overflow:hidden;background:#0d1117;border:1px solid #30363d">
+          <div class="card-header" style="background:#161b22;padding:12px 16px;margin:0;border-bottom:1px solid #30363d;display:flex;justify-content:space-between">
+            <h2 style="font-family:var(--mono);font-size:12px;color:#8b949e">Terminal // Live Logs</h2>
+            <div style="display:flex;gap:6px">
+              <div style="width:10px;height:10px;border-radius:50%;background:#ef4444"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#eab308"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+            </div>
+          </div>
+          <div id="ep-terminal-output" style="height:250px;overflow-y:auto;padding:12px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#c9d1d9">
+            <div style="color:#8b949e;font-style:italic">Waiting for logs...</div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header"><h2>🔗 Sources</h2><span style="color:var(--text-dim);font-size:12px">${srcs.length} added</span></div>
           <div class="sources-list" id="sources-list-${ep.id}">
@@ -549,6 +567,52 @@ async function loadEpisodeDetail(eid) {
         </div>
       </div>
     </div>`;
+
+  // Start listening to live logs
+  subscribeToEpisodeLogs(eid);
+}
+
+function subscribeToEpisodeLogs(eid) {
+  if (currentLogSource) { currentLogSource.close(); }
+
+  const term = document.getElementById("ep-terminal-output");
+  if (!term) return;
+
+  term.innerHTML = `<div style="color:#8b949e;font-style:italic">Connected to pipeline stream...</div>`;
+  currentLogSource = new EventSource(`/api/log-stream/${eid}`);
+
+  currentLogSource.onmessage = ev => {
+    try {
+      if (ev.data === ":heartbeat") return;
+      const log = JSON.parse(ev.data);
+      if (!log.message) return;
+
+      const div = document.createElement("div");
+      div.style.marginBottom = "2px";
+      div.style.display = "flex";
+      div.style.gap = "10px";
+
+      const tsSpan = `<span style="color:#484f58;flex-shrink:0">[${log.ts}]</span>`;
+
+      let color = "#c9d1d9"; // info
+      if (log.level === "success") color = "#3fb950";
+      if (log.level === "error") color = "#f85149";
+      if (log.level === "phase") color = "#58a6ff";
+      if (log.level === "step") color = "#8b949e";
+
+      div.innerHTML = `${tsSpan}<span style="color:${color};word-break:break-all">${escHtml(log.message)}</span>`;
+
+      const isScrolledToBottom = term.scrollHeight - term.clientHeight <= term.scrollTop + 20;
+      term.appendChild(div);
+      if (isScrolledToBottom) {
+        term.scrollTop = term.scrollHeight;
+      }
+    } catch (e) { }
+  };
+
+  currentLogSource.onerror = () => {
+    // Silently reconnects
+  };
 }
 
 function phaseRow(eid, p) {

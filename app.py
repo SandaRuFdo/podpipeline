@@ -57,6 +57,32 @@ def _broadcast_refresh(event_data: dict = None):
     for sid in dead:
         _dashboard_subscribers.pop(sid, None)
 
+# ── EPISODE LIVE LOG SYSTEM ────────────────────────────────────────────────────
+# Antigravity calls POST /api/log/<eid> with messages → stored in rolling buffer
+# Browser subscribes to GET /api/log-stream/<eid> (SSE) → receives them live
+
+from collections import deque
+
+_episode_logs: dict[int, deque] = {}                 # rolling 200-line buffer per episode
+_episode_log_queues: dict[int, dict] = {}            # {eid: {subscriber_id: queue}}
+
+def _broadcast_log(eid: int, entry: dict):
+    """Push a log entry to all browser tabs watching that episode."""
+    import json as _json
+    if eid not in _episode_logs:
+        _episode_logs[eid] = deque(maxlen=200)
+    _episode_logs[eid].append(entry)
+    payload = _json.dumps(entry)
+    msg = f"data: {payload}\n\n"
+    dead = []
+    for sid, q in list(_episode_log_queues.get(eid, {}).items()):
+        try:
+            q.put_nowait(msg)
+        except Exception:
+            dead.append(sid)
+    for sid in dead:
+        _episode_log_queues.get(eid, {}).pop(sid, None)
+
 PHASE_ORDER = ["setup","research","script","audio","transcribe","visuals","deliverables","cinematic_setup"]
 
 
@@ -227,7 +253,8 @@ Run the full pipeline from start to finish for this episode. Do not stop until a
 3. After EACH phase completes, call:
    `python scripts/update_phase.py {eid} <phase> done`
    This updates the dashboard live.
-4. Do NOT stop until deliverables phase is done and walkthrough.md exists.
+4. **IMPORTANT**: Use `python scripts/log_phase.py {eid} "Message" [info|success|error|step]` to push human-readable Live Logs to the user's browser terminal. Do this *frequently* so the user sees what you are doing (e.g. "Drafting script...", "Found 3 sources").
+5. Do NOT stop until deliverables phase is done and walkthrough.md exists.
 
 ## Working Directory
 `episodes/S{int(season):02d}/E{int(episode):02d}_*/`
@@ -524,6 +551,52 @@ def sse_events():
     )
 
 
+# ── LIVE LOG POST & STREAM ────────────────────────────────────────────────────
+
+@app.route("/api/log/<int:eid>", methods=["POST"])
+def post_log(eid):
+    """Receive a log entry from log_phase.py and broadcast to browser tabs."""
+    d = request.json or {}
+    message = d.get("message", "")
+    level   = d.get("level", "info")
+    ts      = d.get("ts", "")
+    if message:
+        _broadcast_log(eid, {"message": message, "level": level, "ts": ts})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/log-stream/<int:eid>")
+def sse_log_stream(eid):
+    """Browser subscribes here to receive live terminal logs for this episode."""
+    sid = str(uuid.uuid4())
+    q: queue.Queue = queue.Queue(maxsize=100)
+    
+    if eid not in _episode_log_queues:
+        _episode_log_queues[eid] = {}
+    _episode_log_queues[eid][sid] = q
+
+    def generate():
+        import json as _json
+        try:
+            # Send history first (up to last 200 lines)
+            if eid in _episode_logs:
+                for entry in _episode_logs[eid]:
+                    yield f"data: {_json.dumps(entry)}\n\n"
+            
+            # Stream live logs
+            while True:
+                try:
+                    msg = q.get(timeout=25)
+                    yield msg
+                except queue.Empty:
+                    yield ":heartbeat\n\n"
+        finally:
+            _episode_log_queues.get(eid, {}).pop(sid, None)
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 # ── MEMORY ────────────────────────────────────────────────────────────────────
 
 @app.route("/api/characters")
@@ -769,6 +842,14 @@ def set_phase_status(eid, phase, status):
     mem_raw("pipeline", "set", eid, phase, status)
     _broadcast_refresh({"action": "phase", "episode_id": eid,
                         "phase": phase, "status": status})
+    
+    # Auto-log phase changes too
+    import datetime
+    ts = datetime.datetime.now().strftime("%H:%M:%S")
+    lvl = "success" if status == "done" else "error" if status == "failed" else "phase"
+    icon = "✅" if status == "done" else "❌" if status == "failed" else "⚙️" if status == "running" else "⏭️"
+    _broadcast_log(eid, {"message": f"{icon} Phase '{phase}' marked as {status.upper()}", "level": lvl, "ts": ts})
+
     return jsonify({"ok": True, "episode_id": eid, "phase": phase, "status": status})
 
 
